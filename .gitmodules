@@ -1,3 +1,7 @@
 [submodule "external/BethesdaCMakeModules"]
 	path = external/BethesdaCMakeModules
 	url = https://github.com/Exit-9B/BethesdaCMakeModules.git
+[submodule "external/CommonLibSSE-NG"]
+	path = external/CommonLibSSE-NG
+	url = https://github.com/alandtse/CommonLibVR.git
+	branch = ng

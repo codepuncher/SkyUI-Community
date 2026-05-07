@@ -1,0 +1,6 @@
+{
+    "name": "directxtk",
+    "version": "2026-03-31",
+    "description": "DirectX Tool Kit for DirectX 11 (headers only for cross-compilation)",
+    "homepage": "https://github.com/Microsoft/DirectXTK"
+}

@@ -1,0 +1,103 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 21,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "_vcpkg",
+            "hidden": true,
+            "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+            "cacheVariables": {
+                "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/cmake/triplets",
+                "VCPKG_OVERLAY_PORTS": "${sourceDir}/cmake/ports",
+                "VCPKG_MANIFEST_MODE": "ON",
+                "VCPKG_APPLOCAL_DEPS": "OFF",
+                "VCPKG_INSTALL_OPTIONS": "--allow-unsupported"
+            }
+        },
+        {
+            "name": "_ninja",
+            "hidden": true,
+            "generator": "Ninja"
+        },
+        {
+            "name": "_vs2022",
+            "hidden": true,
+            "generator": "Visual Studio 17 2022",
+            "architecture": "x64"
+        },
+        {
+            "name": "_buildtype-debug",
+            "hidden": true,
+            "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+        },
+        {
+            "name": "_buildtype-release",
+            "hidden": true,
+            "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+        },
+        {
+            "name": "_compiler-clang-cl-linux",
+            "hidden": true,
+            "cacheVariables": {
+                "VCPKG_TARGET_TRIPLET": "x64-llvm-mingw-static",
+                "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchains/clang-linux.cmake"
+            }
+        },
+        {
+            "name": "_compiler-msvc",
+            "hidden": true,
+            "cacheVariables": {
+                "VCPKG_TARGET_TRIPLET": "x64-windows-static-md"
+            }
+        },
+        {
+            "name": "debug-clang-cl-vcpkg-ae",
+            "displayName": "Debug (AE, Clang-CL, Vcpkg)",
+            "description": "Cross-compile for Skyrim AE from Linux using clang-cl + Ninja",
+            "inherits": ["_vcpkg", "_ninja", "_buildtype-debug", "_compiler-clang-cl-linux"],
+            "binaryDir": "${sourceDir}/build/debug-clang-cl-vcpkg-ae"
+        },
+        {
+            "name": "release-clang-cl-vcpkg-ae",
+            "displayName": "Release (AE, Clang-CL, Vcpkg)",
+            "description": "Cross-compile for Skyrim AE from Linux using clang-cl + Ninja",
+            "inherits": ["_vcpkg", "_ninja", "_buildtype-release", "_compiler-clang-cl-linux"],
+            "binaryDir": "${sourceDir}/build/release-clang-cl-vcpkg-ae"
+        },
+        {
+            "name": "msvc-vcpkg-ae",
+            "displayName": "AE (MSVC, Vcpkg)",
+            "description": "Build for Skyrim AE on Windows using Visual Studio 2022",
+            "inherits": ["_vcpkg", "_vs2022", "_compiler-msvc"],
+            "binaryDir": "${sourceDir}/build/msvc-vcpkg-ae"
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "debug-clang-cl-vcpkg-ae",
+            "displayName": "Debug (AE, Clang-CL, Vcpkg)",
+            "configurePreset": "debug-clang-cl-vcpkg-ae"
+        },
+        {
+            "name": "release-clang-cl-vcpkg-ae",
+            "displayName": "Release (AE, Clang-CL, Vcpkg)",
+            "configurePreset": "release-clang-cl-vcpkg-ae"
+        },
+        {
+            "name": "debug-msvc-vcpkg-ae",
+            "displayName": "Debug (AE, MSVC, Vcpkg)",
+            "configurePreset": "msvc-vcpkg-ae",
+            "configuration": "Debug"
+        },
+        {
+            "name": "release-msvc-vcpkg-ae",
+            "displayName": "Release (AE, MSVC, Vcpkg)",
+            "configurePreset": "msvc-vcpkg-ae",
+            "configuration": "Release"
+        }
+    ]
+}

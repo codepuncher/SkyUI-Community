@@ -100,4 +100,18 @@ if(EXISTS "${_ESP_LIST_FILE}")
     message(STATUS "  Deployed ESP")
 endif()
 
+# 5. SKSE plugin DLL → SKSE/Plugins/
+set(_DLL_LIST_FILE "${DEPLOY_LISTS_DIR}/skse_plugin_dll.txt")
+if(EXISTS "${_DLL_LIST_FILE}")
+    file(STRINGS "${_DLL_LIST_FILE}" _DLL_PATH)
+    if(_DLL_PATH AND EXISTS "${_DLL_PATH}")
+        get_filename_component(_DLL_NAME "${_DLL_PATH}" NAME)
+        file(MAKE_DIRECTORY "${OUTPUT_DIR}/SKSE/Plugins")
+        file(COPY_FILE "${_DLL_PATH}" "${OUTPUT_DIR}/SKSE/Plugins/${_DLL_NAME}" ONLY_IF_DIFFERENT)
+        message(STATUS "  Deployed SKSE plugin: SKSE/Plugins/${_DLL_NAME}")
+    else()
+        message(WARNING "Deploy.cmake: SKSE plugin DLL not found -- skipping.")
+    endif()
+endif()
+
 message(STATUS "Deploy complete -> ${OUTPUT_DIR}")

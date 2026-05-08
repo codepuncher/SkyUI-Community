@@ -31,8 +31,13 @@ option(ENABLE_FPS_PATCH "Enable FPS patching" OFF)
 # SkyrimSE_PATH: absolute path to the game directory. 
 # Defaults to the standard Steam library location if not provided.
 if(NOT DEFINED SkyrimSE_PATH OR SkyrimSE_PATH STREQUAL "")
-    set(SkyrimSE_PATH "C:/Program Files (x86)/Steam/steamapps/common/Skyrim Special Edition"
-        CACHE PATH "Path to Skyrim Special Edition installation")
+    if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+        set(SkyrimSE_PATH "$ENV{HOME}/.local/share/Steam/steamapps/common/Skyrim Special Edition"
+            CACHE PATH "Path to Skyrim Special Edition installation" FORCE)
+    else()
+        set(SkyrimSE_PATH "C:/Program Files (x86)/Steam/steamapps/common/Skyrim Special Edition"
+            CACHE PATH "Path to Skyrim Special Edition installation" FORCE)
+    endif()
 endif()
 
 # Build type setup
@@ -53,6 +58,26 @@ if(IS_DEBUG_BUILD)
         set(MOD_DEBUG_PATH "${CMAKE_CURRENT_SOURCE_DIR}/dist"
             CACHE STRING "Debug output directory (Skyrim Data or MO2 mod folder)" FORCE)
     endif()
+endif()
+
+# SKSE_PLUGIN_DLL: path to the pre-built SkyUI_SE.dll.
+# The plugin is built separately (source/plugin/) with its own CMake presets.
+# Set this to the DLL output path for your build type:
+#   Debug:   source/plugin/build/debug-clang-cl-vcpkg-ae/SkyUI_SE.dll
+#   Release: source/plugin/build/release-clang-cl-vcpkg-ae/SkyUI_SE.dll
+if(NOT DEFINED SKSE_PLUGIN_DLL OR SKSE_PLUGIN_DLL STREQUAL "")
+    if(IS_DEBUG_BUILD)
+        set(_DEFAULT_DLL "${CMAKE_CURRENT_SOURCE_DIR}/source/plugin/build/debug-clang-cl-vcpkg-ae/SkyUI_SE.dll")
+    else()
+        set(_DEFAULT_DLL "${CMAKE_CURRENT_SOURCE_DIR}/source/plugin/build/release-clang-cl-vcpkg-ae/SkyUI_SE.dll")
+    endif()
+    set(SKSE_PLUGIN_DLL "${_DEFAULT_DLL}" CACHE FILEPATH "Path to pre-built SkyUI_SE.dll")
+endif()
+
+if(EXISTS "${SKSE_PLUGIN_DLL}")
+    message(STATUS "[Build] SKSE plugin  : ${SKSE_PLUGIN_DLL}")
+else()
+    message(WARNING "[Build] SKSE plugin not found at ${SKSE_PLUGIN_DLL} -- DLL will be excluded from output. Build source/plugin/ first.")
 endif()
 
 message(STATUS "[Build] Build type : ${CMAKE_BUILD_TYPE}")
@@ -101,19 +126,42 @@ file(GLOB PAPYRUS_SOURCES
 )
 
 if(PAPYRUS_SOURCES)
-    Papyrus_Add(
-        "Papyrus"
-        GAME "${SkyrimSE_PATH}"
-        MODE SkyrimSE
-        IMPORTS
-            "${CMAKE_CURRENT_SOURCE_DIR}/source/scripts"
-            "${SkyrimSE_PATH}/Data/Scripts/Source"
-            "${SkyrimSE_PATH}/Data/Source/Scripts"
-        SOURCES ${PAPYRUS_SOURCES}
-        # OPTIMIZE
-        ANONYMIZE
-        SKIP_DEFAULT_IMPORTS
+    set(_papyrus_imports "${CMAKE_CURRENT_SOURCE_DIR}/source/scripts")
+    foreach(_dir
+        "${SkyrimSE_PATH}/Data/Scripts/Source"
+        "${SkyrimSE_PATH}/Data/Source/Scripts"
     )
+        if(EXISTS "${_dir}")
+            list(APPEND _papyrus_imports "${_dir}")
+        endif()
+    endforeach()
+
+    if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+        # Use the official PapyrusCompiler.exe via Wine (CK must be installed).
+        # Caprica 0.3.0 rejects valid user-defined events that the official
+        # compiler accepts, so we prefer PapyrusCompiler.exe on Linux too.
+        Papyrus_Add(
+            "Papyrus"
+            GAME "${SkyrimSE_PATH}"
+            MODE SkyrimSE
+            IMPORTS ${_papyrus_imports}
+            SOURCES ${PAPYRUS_SOURCES}
+            # OPTIMIZE
+            ANONYMIZE
+            SKIP_DEFAULT_IMPORTS
+        )
+    else()
+        Papyrus_Add(
+            "Papyrus"
+            GAME "${SkyrimSE_PATH}"
+            MODE SkyrimSE
+            IMPORTS ${_papyrus_imports}
+            SOURCES ${PAPYRUS_SOURCES}
+            # OPTIMIZE
+            ANONYMIZE
+            SKIP_DEFAULT_IMPORTS
+        )
+    endif()
 else()
     message(STATUS "[Build] No Papyrus sources found -- skipping.")
     add_custom_target("Papyrus")
@@ -160,6 +208,7 @@ if(IS_DEBUG_BUILD)
     file(WRITE "${_DEPLOY_LISTS_DIR}/swf_compiled.txt"    "${_SWF_COMPILED_CONTENT}")
     file(WRITE "${_DEPLOY_LISTS_DIR}/swf_passthrough.txt" "") # Obsolete
     file(WRITE "${_DEPLOY_LISTS_DIR}/esp_file.txt"        "${_ESP_FILE}")
+    file(WRITE "${_DEPLOY_LISTS_DIR}/skse_plugin_dll.txt" "${SKSE_PLUGIN_DLL}")
 
     add_custom_target("deploy_debug" ALL
         COMMAND "${CMAKE_COMMAND}"
@@ -176,6 +225,21 @@ if(IS_DEBUG_BUILD)
         VERBATIM
     )
     add_dependencies("deploy_debug" "Papyrus" "ActionScript")
+
+    # package_debug: zip the dist/ output into a Vortex-installable archive.
+    # Fixed name so Vortex recognises each rebuild as an update to the same mod.
+    set(_DEV_ZIP_OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/SkyUI_SE_dev.zip")
+    set(_PACKAGE_DEBUG_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/cmake/PackageDebug.cmake")
+
+    add_custom_target("package_debug"
+        COMMAND "${CMAKE_COMMAND}"
+            "-DDIST_DIR=${MOD_DEBUG_PATH}"
+            "-DZIP_OUTPUT=${_DEV_ZIP_OUTPUT}"
+            -P "${_PACKAGE_DEBUG_SCRIPT}"
+        DEPENDS "deploy_debug"
+        COMMENT "Packaging dev build -> ${_DEV_ZIP_OUTPUT}"
+        VERBATIM
+    )
 
 # ---------------------------------------------------------------------------
 # Release Mode -- BSA + ZIP
@@ -218,6 +282,7 @@ else()
             "-DSTAGING_DIR=${_STAGING_DIR}"
             "-DBSA_FILE=${_BSA_FILE}"
             "-DESP_FILE=${_ESP_FILE}"
+            "-DDLL_FILE=${SKSE_PLUGIN_DLL}"
             "-DZIP_OUTPUT=${_ZIP_OUTPUT}"
             -P "${_PACKAGE_SCRIPT}"
         DEPENDS

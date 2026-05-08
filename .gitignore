@@ -1,4 +1,7 @@
 /build/
 /dist/
-/temp_extracted_all/
 /source/plugin/build/
+/temp_extracted_all/
+/tools/Caprica/
+.test-install-manifest
+SkyUI_SE_dev.zip

@@ -10,6 +10,7 @@ Variables expected:
   BSA_FILE      - absolute path to the built .bsa
   ESP_FILE      - absolute path to the .esp
   ZIP_OUTPUT    - absolute path to the final .zip
+  DLL_FILE      - (optional) absolute path to SkyUI_SE.dll; staged at SKSE/Plugins/
 
 #]=======================================================================]
 
@@ -22,7 +23,6 @@ foreach(REQUIRED_VAR STAGING_DIR BSA_FILE ESP_FILE ZIP_OUTPUT)
         message(FATAL_ERROR "Package.cmake: ${REQUIRED_VAR} is not set.")
     endif()
 endforeach()
-
 # ---------------------------------------------------------------------------
 # Packaging Logic
 # ---------------------------------------------------------------------------
@@ -55,11 +55,25 @@ else()
     message(FATAL_ERROR "Package.cmake: ESP file not found: ${ESP_FILE}")
 endif()
 
+# DLL is optional — warn but don't fail if not yet built
+if(DEFINED DLL_FILE AND NOT DLL_FILE STREQUAL "" AND EXISTS "${DLL_FILE}")
+    get_filename_component(_DLL_NAME "${DLL_FILE}" NAME)
+    file(MAKE_DIRECTORY "${STAGING_DIR}/SKSE/Plugins")
+    file(COPY_FILE "${DLL_FILE}" "${STAGING_DIR}/SKSE/Plugins/${_DLL_NAME}" ONLY_IF_DIFFERENT)
+    message(STATUS "  Staged: SKSE/Plugins/${_DLL_NAME}")
+else()
+    message(WARNING "Package.cmake: SKSE plugin DLL not found -- excluded from package.")
+endif()
+
 # 3. Create ZIP archive
+set(_ZIP_ENTRIES "${_BSA_NAME}" "${_ESP_NAME}")
+if(EXISTS "${STAGING_DIR}/SKSE")
+    list(APPEND _ZIP_ENTRIES "SKSE")
+endif()
+
 execute_process(
     COMMAND "${CMAKE_COMMAND}" -E tar cf "${ZIP_OUTPUT}" --format=zip
-        "${_BSA_NAME}"
-        "${_ESP_NAME}"
+        ${_ZIP_ENTRIES}
     WORKING_DIRECTORY "${STAGING_DIR}"
 )
 

@@ -9,6 +9,7 @@
         {
             "name": "_base",
             "hidden": true,
+            "generator": "Ninja",
             "cacheVariables": {
                 "SkyrimSE_PATH": {
                     "type": "PATH",

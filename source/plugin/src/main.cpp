@@ -1,6 +1,7 @@
 #include "PCH.h"
 #include "EventSink.h"
 #include "FormCache.h"
+#include "ScaleformAPI.h"
 
 namespace {
     void MessageHandler(SKSE::MessagingInterface::Message* a_msg) {
@@ -34,6 +35,9 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse) {
 
     auto* messaging = SKSE::GetMessagingInterface();
     messaging->RegisterListener(MessageHandler);
+
+    auto* scaleform = SKSE::GetScaleformInterface();
+    scaleform->Register(SkyUI::ScaleformRegisterCallback, "SkyUI_SE");
 
     logger::info("SkyUI_SE plugin v{} loaded", SKSE::PluginDeclaration::GetSingleton()->GetVersion().string());
 

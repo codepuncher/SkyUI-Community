@@ -58,6 +58,7 @@ add_commonlibsse_plugin(${PROJECT_NAME}
         src/main.cpp
         src/EventSink.cpp
         src/FormCache.cpp
+        src/ScaleformAPI.cpp
     USE_ADDRESS_LIBRARY
 )
 

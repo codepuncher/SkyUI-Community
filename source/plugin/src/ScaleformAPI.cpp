@@ -62,13 +62,48 @@ namespace SkyUI {
     };
 
     // ---------------------------------------------------------------------------
+    // Log — ActionScript signature:
+    //   SkyUI_SE_Log(msg: String) : Void
+    //
+    // Writes a message from AS2 directly into the SKSE plugin log.
+    // Used by the benchmark timing code in InventoryDataSetter.processList.
+    // ---------------------------------------------------------------------------
+    class LogFn : public RE::GFxFunctionHandler {
+    public:
+        void Call(Params& a_params) override {
+            if (a_params.argCount < 1) return;
+            const auto str = a_params.args[0].ToString();
+            logger::info("[AS2] {}", str.c_str());
+        }
+    };
+
+    // ---------------------------------------------------------------------------
     // ScaleformRegisterCallback — called by SKSE for every GFx movie loaded.
-    // Registers our functions into the movie's root scope.
+    // Registers our functions into both _root and _global.
+    //
+    // _root is a MovieClip property — accessible from timeline frame scripts but
+    // NOT from plain AS2 class instances (e.g. InventoryDataSetter, which extends
+    // ItemcardDataExtender, not MovieClip).  _global is accessible from any scope
+    // including class methods, so we register on both for maximum compatibility.
     // ---------------------------------------------------------------------------
     bool ScaleformRegisterCallback(RE::GFxMovieView* a_view, RE::GFxValue* a_root) {
-        RE::GFxValue fn;
-        a_view->CreateFunction(&fn, new GetStaticDataFn());
-        a_root->SetMember("SkyUI_SE_GetStaticData", fn);
+        RE::GFxValue fnGetStaticData;
+        a_view->CreateFunction(&fnGetStaticData, new GetStaticDataFn());
+
+        RE::GFxValue fnLog;
+        a_view->CreateFunction(&fnLog, new LogFn());
+
+        // Register on _root (for any timeline/MovieClip code)
+        a_root->SetMember("SkyUI_SE_GetStaticData", fnGetStaticData);
+        a_root->SetMember("SkyUI_SE_Log", fnLog);
+
+        // Also register on _global so plain class instances can reach them
+        RE::GFxValue globalObj;
+        a_view->GetVariable(&globalObj, "_global");
+        if (globalObj.IsObject()) {
+            globalObj.SetMember("SkyUI_SE_GetStaticData", fnGetStaticData);
+            globalObj.SetMember("SkyUI_SE_Log", fnLog);
+        }
 
         logger::debug("ScaleformAPI: registered SkyUI_SE_GetStaticData in {}",
                       a_view->GetMovieDef() ? a_view->GetMovieDef()->GetFileURL() : "unknown");

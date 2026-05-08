@@ -1,8 +1,26 @@
 class InventoryDataSetter extends ItemcardDataExtender
 {
+   // Benchmark counters — reset each processList call, accumulated per processEntry.
+   // Logged to the SKSE plugin log via SkyUI_SE_Log whenever new items are processed
+   // (i.e. each inventory open that contains items not yet seen this session).
+   var _perfFastCount = 0;
+   var _perfSlowCount = 0;
    function InventoryDataSetter()
    {
       super();
+   }
+   // Override processList to time the full classification pass and log results.
+   function processList(a_list)
+   {
+      _perfFastCount = 0;
+      _perfSlowCount = 0;
+      var _t0 = getTimer();
+      super.processList(a_list);
+      var _elapsed = getTimer() - _t0;
+      var _total = _perfFastCount + _perfSlowCount;
+      if (_total > 0 && _global["SkyUI_SE_Log"] != undefined) {
+         _global.SkyUI_SE_Log("processList: " + _elapsed + "ms | " + _total + " items | fast=" + _perfFastCount + " slow=" + _perfSlowCount);
+      }
    }
    function processEntry(a_entryObject, a_itemInfo)
    {
@@ -16,8 +34,8 @@ class InventoryDataSetter extends ItemcardDataExtender
       a_entryObject.infoValueWeight = !(a_itemInfo.weight > 0 && a_itemInfo.value > 0) ? null : Math.round(a_itemInfo.value / a_itemInfo.weight);
       // Fast path: static item data pre-computed in C++ by SkyUI_SE.dll.
       // Falls back to the original keyword-lookup path on cache miss.
-      var _sd = (_root["SkyUI_SE_GetStaticData"] != undefined)
-                   ? _root.SkyUI_SE_GetStaticData(a_entryObject.formId)
+      var _sd = (_global["SkyUI_SE_GetStaticData"] != undefined)
+                   ? _global.SkyUI_SE_GetStaticData(a_entryObject.formId)
                    : undefined;
       switch(a_entryObject.formType)
       {
@@ -31,6 +49,7 @@ class InventoryDataSetter extends ItemcardDataExtender
             a_entryObject.isEnchanted = a_itemInfo.effects != "";
             a_entryObject.infoArmor = a_itemInfo.armor <= 0 ? null : Math.round(a_itemInfo.armor * 100) / 100;
             if (_sd != undefined) {
+               _perfFastCount++;
                a_entryObject.mainPartMask = _sd.mainPartMask > 0 ? _sd.mainPartMask : undefined;
                a_entryObject.subType = _sd.subType >= 0 ? _sd.subType : null;
                a_entryObject.subTypeDisplay = _sd.subType >= 0 ? this.getArmorSubTypeDisplay(_sd.subType) : undefined;
@@ -39,6 +58,7 @@ class InventoryDataSetter extends ItemcardDataExtender
                a_entryObject.material = _sd.material >= 0 ? _sd.material : null;
                a_entryObject.materialDisplay = this.getMaterialDisplay(a_entryObject.material);
             } else {
+               _perfSlowCount++;
                this.processArmorClass(a_entryObject);
                this.processArmorPartMask(a_entryObject);
                this.processMaterialKeywords(a_entryObject); 
@@ -65,11 +85,13 @@ class InventoryDataSetter extends ItemcardDataExtender
             a_entryObject.isPoisoned = a_itemInfo.poisoned == true;
             a_entryObject.infoDamage = a_itemInfo.damage <= 0 ? null : Math.round(a_itemInfo.damage * 100) / 100;
             if (_sd != undefined) {
+               _perfFastCount++;
                a_entryObject.subType = _sd.subType >= 0 ? _sd.subType : null;
                a_entryObject.subTypeDisplay = _sd.subType >= 0 ? this.getWeaponSubTypeDisplay(_sd.subType) : skyui.util.Translator.translate("$Weapon");
                a_entryObject.material = _sd.material >= 0 ? _sd.material : null;
                a_entryObject.materialDisplay = this.getMaterialDisplay(a_entryObject.material);
             } else {
+               _perfSlowCount++;
                this.processWeaponType(a_entryObject);
                this.processMaterialKeywords(a_entryObject);
                this.processWeaponBaseId(a_entryObject);
@@ -79,11 +101,13 @@ class InventoryDataSetter extends ItemcardDataExtender
             a_entryObject.isEnchanted = a_itemInfo.effects != "";
             a_entryObject.infoDamage = a_itemInfo.damage <= 0 ? null : Math.round(a_itemInfo.damage * 100) / 100;
             if (_sd != undefined) {
+               _perfFastCount++;
                a_entryObject.subType = _sd.subType >= 0 ? _sd.subType : null;
                a_entryObject.subTypeDisplay = this.getAmmoSubTypeDisplay(_sd.subType);
                a_entryObject.material = _sd.material >= 0 ? _sd.material : null;
                a_entryObject.materialDisplay = this.getMaterialDisplay(a_entryObject.material);
             } else {
+               _perfSlowCount++;
                this.processAmmoType(a_entryObject);
                this.processMaterialKeywords(a_entryObject);
                this.processAmmoBaseId(a_entryObject);
@@ -1335,7 +1359,7 @@ class InventoryDataSetter extends ItemcardDataExtender
    // Each function maps an integer constant (from skyui.defines.*) to its
    // localised display string, matching the translate() calls in the original
    // process* functions above.  Used only when _sd (the cached object returned
-   // by _root.SkyUI_SE_GetStaticData) is defined.
+   // by _global.SkyUI_SE_GetStaticData) is defined.
    // ---------------------------------------------------------------------------
    function getWeaponSubTypeDisplay(a_subType)
    {

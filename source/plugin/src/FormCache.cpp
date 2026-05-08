@@ -233,7 +233,8 @@ namespace SkyUI {
         // partMask → mainPartMask → subType.
         const auto slotMask = a_armor->GetSlotMask().underlying();
         d.mainPartMask = GetMainPartMask(slotMask);
-        d.subType      = ArmorSubTypeFromPartMask(d.mainPartMask);
+        if (d.mainPartMask > 0)
+            d.subType = ArmorSubTypeFromPartMask(d.mainPartMask);
 
         // Clothing/jewelry disambiguation for pieces that have WEIGHT_NONE.
         d.weightClass = ResolveWeightClass(d.weightClass, d.mainPartMask, a_armor);

@@ -25,11 +25,26 @@ if(NOT EXISTS "${DIST_DIR}")
     message(FATAL_ERROR "PackageDebug.cmake: DIST_DIR does not exist: ${DIST_DIR}")
 endif()
 
-# Phase 1 (FormCache / Scaleform API): only the DLL is needed.
-# SWFs, BSA, ESP, and Papyrus scripts all come from the official SkyUI mod
-# in the Vortex Dev profile.  The ActionScript fast path (Phase 2) will add
-# SWF compilation back when the time comes.
 set(_TOP_ENTRIES "SKSE")
+
+# Phase 2 (AS3 cache fast-path): include only the four inventory SWFs that
+# embed InventoryDataSetter (the class modified to use the cache fast path).
+# These override the corresponding files in the user's existing SkyUI install.
+set(_INVENTORY_SWFS
+    inventorymenu.swf
+    containermenu.swf
+    bartermenu.swf
+    giftmenu.swf
+)
+
+set(_INTERFACE_DIR "${DIST_DIR}/interface")
+foreach(_swf ${_INVENTORY_SWFS})
+    if(EXISTS "${_INTERFACE_DIR}/${_swf}")
+        list(APPEND _TOP_ENTRIES "interface/${_swf}")
+    else()
+        message(WARNING "PackageDebug.cmake: ${_swf} not found in dist/interface/ — SWF will be missing from zip.")
+    endif()
+endforeach()
 
 if(NOT EXISTS "${DIST_DIR}/SKSE/Plugins/SkyUI_SE.dll")
     message(FATAL_ERROR "PackageDebug.cmake: SkyUI_SE.dll not found. Build source/plugin/ first.")

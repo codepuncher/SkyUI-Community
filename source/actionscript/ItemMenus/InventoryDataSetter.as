@@ -14,6 +14,11 @@ class InventoryDataSetter extends ItemcardDataExtender
       a_entryObject.infoValue = a_itemInfo.value <= 0 ? null : Math.round(a_itemInfo.value * 100) / 100;
       a_entryObject.infoWeight = a_itemInfo.weight <= 0 ? null : Math.round(a_itemInfo.weight * 100) / 100;
       a_entryObject.infoValueWeight = !(a_itemInfo.weight > 0 && a_itemInfo.value > 0) ? null : Math.round(a_itemInfo.value / a_itemInfo.weight);
+      // Fast path: static item data pre-computed in C++ by SkyUI_SE.dll.
+      // Falls back to the original keyword-lookup path on cache miss.
+      var _sd = (_root["SkyUI_SE_GetStaticData"] != undefined)
+                   ? _root.SkyUI_SE_GetStaticData(a_entryObject.formId)
+                   : undefined;
       switch(a_entryObject.formType)
       {
          case skyui.defines.Form.TYPE_SCROLLITEM:
@@ -25,11 +30,21 @@ class InventoryDataSetter extends ItemcardDataExtender
          case skyui.defines.Form.TYPE_ARMOR:
             a_entryObject.isEnchanted = a_itemInfo.effects != "";
             a_entryObject.infoArmor = a_itemInfo.armor <= 0 ? null : Math.round(a_itemInfo.armor * 100) / 100;
-            this.processArmorClass(a_entryObject);
-            this.processArmorPartMask(a_entryObject);
-            this.processMaterialKeywords(a_entryObject); 
-            this.processArmorOther(a_entryObject);
-            this.processArmorBaseId(a_entryObject);
+            if (_sd != undefined) {
+               a_entryObject.mainPartMask = _sd.mainPartMask > 0 ? _sd.mainPartMask : undefined;
+               a_entryObject.subType = _sd.subType >= 0 ? _sd.subType : null;
+               a_entryObject.subTypeDisplay = _sd.subType >= 0 ? this.getArmorSubTypeDisplay(_sd.subType) : undefined;
+               a_entryObject.weightClass = (_sd.weightClass >= 0 && _sd.weightClass != skyui.defines.Armor.WEIGHT_NONE) ? _sd.weightClass : null;
+               a_entryObject.weightClassDisplay = this.getWeightClassDisplay(a_entryObject.weightClass);
+               a_entryObject.material = _sd.material >= 0 ? _sd.material : null;
+               a_entryObject.materialDisplay = this.getMaterialDisplay(a_entryObject.material);
+            } else {
+               this.processArmorClass(a_entryObject);
+               this.processArmorPartMask(a_entryObject);
+               this.processMaterialKeywords(a_entryObject); 
+               this.processArmorOther(a_entryObject);
+               this.processArmorBaseId(a_entryObject);
+            }
             break;
          case skyui.defines.Form.TYPE_BOOK:
             this.processBookType(a_entryObject);
@@ -49,16 +64,30 @@ class InventoryDataSetter extends ItemcardDataExtender
             a_entryObject.isEnchanted = a_itemInfo.effects != "";
             a_entryObject.isPoisoned = a_itemInfo.poisoned == true;
             a_entryObject.infoDamage = a_itemInfo.damage <= 0 ? null : Math.round(a_itemInfo.damage * 100) / 100;
-            this.processWeaponType(a_entryObject);
-            this.processMaterialKeywords(a_entryObject);
-            this.processWeaponBaseId(a_entryObject);
+            if (_sd != undefined) {
+               a_entryObject.subType = _sd.subType >= 0 ? _sd.subType : null;
+               a_entryObject.subTypeDisplay = _sd.subType >= 0 ? this.getWeaponSubTypeDisplay(_sd.subType) : skyui.util.Translator.translate("$Weapon");
+               a_entryObject.material = _sd.material >= 0 ? _sd.material : null;
+               a_entryObject.materialDisplay = this.getMaterialDisplay(a_entryObject.material);
+            } else {
+               this.processWeaponType(a_entryObject);
+               this.processMaterialKeywords(a_entryObject);
+               this.processWeaponBaseId(a_entryObject);
+            }
             break;
          case skyui.defines.Form.TYPE_AMMO:
             a_entryObject.isEnchanted = a_itemInfo.effects != "";
             a_entryObject.infoDamage = a_itemInfo.damage <= 0 ? null : Math.round(a_itemInfo.damage * 100) / 100;
-            this.processAmmoType(a_entryObject);
-            this.processMaterialKeywords(a_entryObject);
-            this.processAmmoBaseId(a_entryObject);
+            if (_sd != undefined) {
+               a_entryObject.subType = _sd.subType >= 0 ? _sd.subType : null;
+               a_entryObject.subTypeDisplay = this.getAmmoSubTypeDisplay(_sd.subType);
+               a_entryObject.material = _sd.material >= 0 ? _sd.material : null;
+               a_entryObject.materialDisplay = this.getMaterialDisplay(a_entryObject.material);
+            } else {
+               this.processAmmoType(a_entryObject);
+               this.processMaterialKeywords(a_entryObject);
+               this.processAmmoBaseId(a_entryObject);
+            }
             break;
          case skyui.defines.Form.TYPE_KEY:
             this.processKeyType(a_entryObject);
@@ -1299,6 +1328,104 @@ class InventoryDataSetter extends ItemcardDataExtender
             a_entryObject.subTypeDisplay = skyui.util.Translator.translate("$AyleidCrystal");
          default:
             return;
+      }
+   }
+   // ---------------------------------------------------------------------------
+   // Display-string helpers for the SkyUI_SE cache fast path.
+   // Each function maps an integer constant (from skyui.defines.*) to its
+   // localised display string, matching the translate() calls in the original
+   // process* functions above.  Used only when _sd (the cached object returned
+   // by _root.SkyUI_SE_GetStaticData) is defined.
+   // ---------------------------------------------------------------------------
+   function getWeaponSubTypeDisplay(a_subType)
+   {
+      switch(a_subType)
+      {
+         case skyui.defines.Weapon.TYPE_MELEE:      return skyui.util.Translator.translate("$Melee");
+         case skyui.defines.Weapon.TYPE_SWORD:      return skyui.util.Translator.translate("$Sword");
+         case skyui.defines.Weapon.TYPE_DAGGER:     return skyui.util.Translator.translate("$Dagger");
+         case skyui.defines.Weapon.TYPE_WARAXE:     return skyui.util.Translator.translate("$War Axe");
+         case skyui.defines.Weapon.TYPE_MACE:       return skyui.util.Translator.translate("$Mace");
+         case skyui.defines.Weapon.TYPE_GREATSWORD: return skyui.util.Translator.translate("$Greatsword");
+         case skyui.defines.Weapon.TYPE_BATTLEAXE:  return skyui.util.Translator.translate("$Battleaxe");
+         case skyui.defines.Weapon.TYPE_WARHAMMER:  return skyui.util.Translator.translate("$Warhammer");
+         case skyui.defines.Weapon.TYPE_BOW:        return skyui.util.Translator.translate("$Bow");
+         case skyui.defines.Weapon.TYPE_CROSSBOW:   return skyui.util.Translator.translate("$Crossbow");
+         case skyui.defines.Weapon.TYPE_STAFF:      return skyui.util.Translator.translate("$Staff");
+         case skyui.defines.Weapon.TYPE_PICKAXE:    return skyui.util.Translator.translate("$Pickaxe");
+         case skyui.defines.Weapon.TYPE_WOODAXE:    return skyui.util.Translator.translate("$Wood Axe");
+         case skyui.defines.Weapon.TYPE_FISHINGROD: return skyui.util.Translator.translate("$FishingRod");
+         default:                                   return skyui.util.Translator.translate("$Weapon");
+      }
+   }
+   function getAmmoSubTypeDisplay(a_subType)
+   {
+      if (a_subType == skyui.defines.Weapon.AMMO_BOLT)
+         return skyui.util.Translator.translate("$Bolt");
+      return skyui.util.Translator.translate("$Arrow");
+   }
+   function getArmorSubTypeDisplay(a_subType)
+   {
+      switch(a_subType)
+      {
+         case skyui.defines.Armor.EQUIP_HEAD:
+         case skyui.defines.Armor.EQUIP_HAIR:
+         case skyui.defines.Armor.EQUIP_LONGHAIR:  return skyui.util.Translator.translate("$Head");
+         case skyui.defines.Armor.EQUIP_BODY:      return skyui.util.Translator.translate("$Body");
+         case skyui.defines.Armor.EQUIP_HANDS:     return skyui.util.Translator.translate("$Hands");
+         case skyui.defines.Armor.EQUIP_FOREARMS:  return skyui.util.Translator.translate("$Forearms");
+         case skyui.defines.Armor.EQUIP_AMULET:    return skyui.util.Translator.translate("$Amulet");
+         case skyui.defines.Armor.EQUIP_RING:      return skyui.util.Translator.translate("$Ring");
+         case skyui.defines.Armor.EQUIP_FEET:      return skyui.util.Translator.translate("$Feet");
+         case skyui.defines.Armor.EQUIP_CALVES:    return skyui.util.Translator.translate("$Calves");
+         case skyui.defines.Armor.EQUIP_SHIELD:    return skyui.util.Translator.translate("$Shield");
+         case skyui.defines.Armor.EQUIP_CIRCLET:   return skyui.util.Translator.translate("$Circlet");
+         case skyui.defines.Armor.EQUIP_EARS:      return skyui.util.Translator.translate("$Ears");
+         case skyui.defines.Armor.EQUIP_TAIL:      return skyui.util.Translator.translate("$Tail");
+         case skyui.defines.Armor.EQUIP_CLOAK:     return skyui.util.Translator.translate("$ClothingCloak");
+         case skyui.defines.Armor.EQUIP_BACKPACK:  return skyui.util.Translator.translate("$Backpack");
+         default:                                  return "";
+      }
+   }
+   function getMaterialDisplay(a_material)
+   {
+      switch(a_material)
+      {
+         case skyui.defines.Material.AMBER:      return skyui.util.Translator.translate("$Amber");
+         case skyui.defines.Material.BONEMOLD:   return skyui.util.Translator.translate("$Bonemold");
+         case skyui.defines.Material.CHITIN:     return skyui.util.Translator.translate("$Chitin");
+         case skyui.defines.Material.DAEDRIC:    return skyui.util.Translator.translate("$Daedric");
+         case skyui.defines.Material.DRAGON:     return skyui.util.Translator.translate("$Dragon");
+         case skyui.defines.Material.DWARVEN:    return skyui.util.Translator.translate("$Dwarven");
+         case skyui.defines.Material.EBONY:      return skyui.util.Translator.translate("$Ebony");
+         case skyui.defines.Material.ELVEN:      return skyui.util.Translator.translate("$Elven");
+         case skyui.defines.Material.FALMER:     return skyui.util.Translator.translate("$Falmer");
+         case skyui.defines.Material.GLASS:      return skyui.util.Translator.translate("$Glass");
+         case skyui.defines.Material.HIDE:       return skyui.util.Translator.translate("$Hide");
+         case skyui.defines.Material.IMPERIAL:   return skyui.util.Translator.translate("$Imperial");
+         case skyui.defines.Material.IRON:       return skyui.util.Translator.translate("$Iron");
+         case skyui.defines.Material.LEATHER:    return skyui.util.Translator.translate("$Leather");
+         case skyui.defines.Material.MADNESS:    return skyui.util.Translator.translate("$Madness");
+         case skyui.defines.Material.NORDIC:     return skyui.util.Translator.translate("$Nordic");
+         case skyui.defines.Material.ORCISH:     return skyui.util.Translator.translate("$Orcish");
+         case skyui.defines.Material.ORDINATOR:  return skyui.util.Translator.translate("$Ordinator");
+         case skyui.defines.Material.SILVER:     return skyui.util.Translator.translate("$Silver");
+         case skyui.defines.Material.STALHRIM:   return skyui.util.Translator.translate("$Stalhrim");
+         case skyui.defines.Material.STEEL:      return skyui.util.Translator.translate("$Steel");
+         case skyui.defines.Material.STORMCLOAK: return skyui.util.Translator.translate("$Stormcloak");
+         case skyui.defines.Material.WOOD:       return skyui.util.Translator.translate("$Wood");
+         default:                                return skyui.util.Translator.translate("$Other");
+      }
+   }
+   function getWeightClassDisplay(a_weightClass)
+   {
+      switch(a_weightClass)
+      {
+         case skyui.defines.Armor.WEIGHT_LIGHT:    return skyui.util.Translator.translate("$Light");
+         case skyui.defines.Armor.WEIGHT_HEAVY:    return skyui.util.Translator.translate("$Heavy");
+         case skyui.defines.Armor.WEIGHT_CLOTHING: return skyui.util.Translator.translate("$Clothing");
+         case skyui.defines.Armor.WEIGHT_JEWELRY:  return skyui.util.Translator.translate("$Jewelry");
+         default:                                  return skyui.util.Translator.translate("$Other");
       }
    }
 }

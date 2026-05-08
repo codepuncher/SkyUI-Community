@@ -54,7 +54,10 @@ configure_file(
 add_commonlibsse_plugin(${PROJECT_NAME}
     NAME    "SkyUI_SE"
     AUTHOR  "SkyUI Community"
-    SOURCES src/main.cpp
+    SOURCES
+        src/main.cpp
+        src/EventSink.cpp
+        src/FormCache.cpp
     USE_ADDRESS_LIBRARY
 )
 

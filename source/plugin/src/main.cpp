@@ -1,10 +1,20 @@
 #include "PCH.h"
+#include "EventSink.h"
+#include "FormCache.h"
 
 namespace {
     void MessageHandler(SKSE::MessagingInterface::Message* a_msg) {
         switch (a_msg->type) {
             case SKSE::MessagingInterface::kDataLoaded:
                 logger::info("SkyUI plugin: data loaded");
+                SkyUI::RegisterEventSinks();
+                break;
+            case SKSE::MessagingInterface::kNewGame:
+            case SKSE::MessagingInterface::kPostLoadGame:
+                // Clear cache on new game or load so stale FormIDs from a previous
+                // session don't persist.  The cache is repopulated on next
+                // inventory open.
+                SkyUI::FormCache::GetSingleton()->Clear();
                 break;
         }
     }

@@ -1,0 +1,550 @@
+#include "FormCache.h"
+
+namespace SkyUI {
+
+    // ---------------------------------------------------------------------------
+    // Biped slot bitmask values — match skyui.defines.Armor.PARTMASK_* exactly.
+    // CommonLibSSE uses named enum values up to kEars (1<<13); slots 14-17 are
+    // unnamed in CommonLib but are well-known SkyUI slots (Cloak, Backpack…).
+    // ---------------------------------------------------------------------------
+    namespace PartMask {
+        inline constexpr std::uint32_t kHead     = 1u << 0;
+        inline constexpr std::uint32_t kHair     = 1u << 1;
+        inline constexpr std::uint32_t kBody     = 1u << 2;
+        inline constexpr std::uint32_t kHands    = 1u << 3;
+        inline constexpr std::uint32_t kForearms = 1u << 4;
+        inline constexpr std::uint32_t kAmulet   = 1u << 5;
+        inline constexpr std::uint32_t kRing     = 1u << 6;
+        inline constexpr std::uint32_t kFeet     = 1u << 7;
+        inline constexpr std::uint32_t kCalves   = 1u << 8;
+        inline constexpr std::uint32_t kShield   = 1u << 9;
+        inline constexpr std::uint32_t kTail     = 1u << 10;
+        inline constexpr std::uint32_t kLongHair = 1u << 11;
+        inline constexpr std::uint32_t kCirclet  = 1u << 12;
+        inline constexpr std::uint32_t kEars     = 1u << 13;
+        inline constexpr std::uint32_t kSlot14   = 1u << 14;
+        inline constexpr std::uint32_t kSlot15   = 1u << 15;
+        inline constexpr std::uint32_t kCloak    = 1u << 16;  // kModChestPrimary in CommonLib
+        inline constexpr std::uint32_t kBackpack = 1u << 17;  // kModBack in CommonLib
+    }
+
+    // Precedence order mirrors PARTMASK_PRECEDENCE in Armor.as.
+    static constexpr std::uint32_t kPartMaskPrecedence[] = {
+        PartMask::kBody,    PartMask::kHair,     PartMask::kHands,
+        PartMask::kForearms,PartMask::kFeet,     PartMask::kCalves,
+        PartMask::kShield,  PartMask::kAmulet,   PartMask::kRing,
+        PartMask::kLongHair,PartMask::kEars,     PartMask::kHead,
+        PartMask::kCirclet, PartMask::kTail,     PartMask::kSlot14,
+        PartMask::kSlot15,  PartMask::kCloak,    PartMask::kBackpack,
+    };
+
+    // ---------------------------------------------------------------------------
+    // Hardcoded base-game FormIDs for pickaxes and wood axes.
+    // Mirrors processWeaponBaseId() in InventoryDataSetter.as.
+    // Only base-game (plugin index 0x00) forms need this treatment; DLC2 pickaxes
+    // (index 0x04) are handled there too but use the same kPickaxe constant.
+    // ---------------------------------------------------------------------------
+    namespace WeaponFormID {
+        // Pickaxes (Skyrim.esm)
+        inline constexpr RE::FormID kPickaxe               = 0x000E3C16;
+        inline constexpr RE::FormID kPickaxeRockSplinter   = 0x0006A707;
+        inline constexpr RE::FormID kPickaxeVolunruud      = 0x001019D4;
+        // Wood axes (Skyrim.esm)
+        inline constexpr RE::FormID kWoodAxe               = 0x0002F2F4;
+        inline constexpr RE::FormID kWoodAxePoacherHalted  = 0x000AE086;
+        // Dragonborn DLC pickaxes (plugin index 0x04)
+        inline constexpr RE::FormID kDLC2Pickaxe1          = 0x04027113;
+        inline constexpr RE::FormID kDLC2Pickaxe2          = 0x0402711C;
+        inline constexpr RE::FormID kDLC2Pickaxe3          = 0x04027120;
+        // Bows with Wood material (Skyrim.esm)
+        inline constexpr RE::FormID kLongbow               = 0x0003B562;
+        inline constexpr RE::FormID kHuntingBow            = 0x00013985;
+        inline constexpr RE::FormID kDravinsbow            = 0x0006B9AD;
+    }
+
+    // ---------------------------------------------------------------------------
+    // FormCache — singleton
+    // ---------------------------------------------------------------------------
+    FormCache* FormCache::GetSingleton() {
+        static FormCache instance;
+        return &instance;
+    }
+
+    void FormCache::Populate(RE::Actor* a_actor) {
+        if (!a_actor) return;
+
+        auto inventory = a_actor->GetInventory();
+
+        // Build entries for every form not yet in the cache.
+        std::unordered_map<RE::FormID, CachedItemData> newEntries;
+        {
+            std::shared_lock lock(_mutex);
+            for (auto& [item, data] : inventory) {
+                if (!item) continue;
+                if (_cache.contains(item->GetFormID())) continue;
+                newEntries.emplace(item->GetFormID(), BuildItemData(item));
+            }
+        }
+
+        if (newEntries.empty()) return;
+
+        const std::size_t added = newEntries.size();
+        {
+            std::unique_lock lock(_mutex);
+            _cache.merge(newEntries);
+        }
+
+        logger::debug("FormCache: populated {} new entries (total {})",
+                      added, _cache.size());
+    }
+
+    void FormCache::Clear() {
+        std::unique_lock lock(_mutex);
+        _cache.clear();
+        logger::debug("FormCache: cleared");
+    }
+
+    const CachedItemData* FormCache::Get(RE::FormID a_formID) const {
+        std::shared_lock lock(_mutex);
+        auto it = _cache.find(a_formID);
+        return (it != _cache.end()) ? &it->second : nullptr;
+    }
+
+    // ---------------------------------------------------------------------------
+    // BuildItemData — dispatch to type-specific builders
+    // ---------------------------------------------------------------------------
+    CachedItemData FormCache::BuildItemData(RE::TESBoundObject* a_item) {
+        if (!a_item) return {};
+
+        if (auto* weap = a_item->As<RE::TESObjectWEAP>())    return BuildWeaponData(weap);
+        if (auto* armo = a_item->As<RE::TESObjectARMO>())    return BuildArmorData(armo);
+        if (auto* ammo = a_item->As<RE::TESAmmo>())          return BuildAmmoData(ammo);
+        if (auto* book = a_item->As<RE::TESObjectBOOK>())    return BuildBookData(book);
+        if (auto* alch = a_item->As<RE::AlchemyItem>())      return BuildAlchemyData(alch);
+        if (auto* ingr = a_item->As<RE::IngredientItem>())   return BuildIngredientData(ingr);
+        if (auto* key  = a_item->As<RE::TESKey>())           return BuildKeyData(key);
+        if (auto* soul = a_item->As<RE::TESSoulGem>())       return BuildSoulGemData(soul);
+        if (auto* scrl = a_item->As<RE::ScrollItem>())       return BuildScrollData(scrl);
+        if (auto* misc = a_item->As<RE::TESObjectMISC>())    return BuildMiscData(misc);
+
+        return {};
+    }
+
+    // ---------------------------------------------------------------------------
+    // Weapons
+    // ---------------------------------------------------------------------------
+    CachedItemData FormCache::BuildWeaponData(RE::TESObjectWEAP* a_weapon) {
+        CachedItemData d;
+
+        // Determine subType from weapon animation type.
+        const auto formID = a_weapon->GetFormID();
+        switch (a_weapon->GetWeaponType()) {
+            case RE::WEAPON_TYPE::kHandToHandMelee:
+                d.subType = WeaponSubType::kMelee;
+                break;
+            case RE::WEAPON_TYPE::kOneHandSword:
+                if (a_weapon->HasKeywordString("ccBGSSSE001_FishingPoleKW"))
+                    d.subType = WeaponSubType::kFishingRod;
+                else
+                    d.subType = WeaponSubType::kSword;
+                break;
+            case RE::WEAPON_TYPE::kOneHandDagger:
+                d.subType = WeaponSubType::kDagger;
+                break;
+            case RE::WEAPON_TYPE::kOneHandAxe:
+                d.subType = WeaponSubType::kWarAxe;
+                break;
+            case RE::WEAPON_TYPE::kOneHandMace:
+                d.subType = WeaponSubType::kMace;
+                break;
+            case RE::WEAPON_TYPE::kTwoHandSword:
+                d.subType = WeaponSubType::kGreatsword;
+                break;
+            case RE::WEAPON_TYPE::kTwoHandAxe:
+                d.subType = a_weapon->HasKeywordString("WeapTypeWarhammer")
+                                ? WeaponSubType::kWarhammer
+                                : WeaponSubType::kBattleAxe;
+                break;
+            case RE::WEAPON_TYPE::kBow:
+                d.subType = WeaponSubType::kBow;
+                break;
+            case RE::WEAPON_TYPE::kStaff:
+                d.subType = WeaponSubType::kStaff;
+                break;
+            case RE::WEAPON_TYPE::kCrossbow:
+                d.subType = WeaponSubType::kCrossbow;
+                break;
+            default:
+                break;
+        }
+
+        // Override subType for hardcoded base-game tool weapons.
+        switch (formID) {
+            case WeaponFormID::kPickaxe:
+            case WeaponFormID::kPickaxeRockSplinter:
+            case WeaponFormID::kPickaxeVolunruud:
+            case WeaponFormID::kDLC2Pickaxe1:
+            case WeaponFormID::kDLC2Pickaxe2:
+            case WeaponFormID::kDLC2Pickaxe3:
+                d.subType = WeaponSubType::kPickaxe;
+                break;
+            case WeaponFormID::kWoodAxe:
+            case WeaponFormID::kWoodAxePoacherHalted:
+                d.subType = WeaponSubType::kWoodAxe;
+                break;
+            default:
+                break;
+        }
+
+        // Material from keywords.
+        d.material = GetMaterial(a_weapon);
+
+        // Hardcoded wood material for unkeyworted hunting bows.
+        if (d.material == MaterialType::kNone) {
+            switch (formID) {
+                case WeaponFormID::kLongbow:
+                case WeaponFormID::kHuntingBow:
+                case WeaponFormID::kDravinsbow:
+                    d.material = MaterialType::kWood;
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        return d;
+    }
+
+    // ---------------------------------------------------------------------------
+    // Armor
+    // ---------------------------------------------------------------------------
+    CachedItemData FormCache::BuildArmorData(RE::TESObjectARMO* a_armor) {
+        CachedItemData d;
+
+        // weightClass from engine armor type, then refined for clothing/jewelry.
+        const auto armorType = a_armor->GetArmorType();
+        if (armorType == RE::BGSBipedObjectForm::ArmorType::kLightArmor)
+            d.weightClass = ArmorWeightClass::kLight;
+        else if (armorType == RE::BGSBipedObjectForm::ArmorType::kHeavyArmor)
+            d.weightClass = ArmorWeightClass::kHeavy;
+        else
+            d.weightClass = ArmorWeightClass::kNone;  // will be refined below
+
+        // partMask → mainPartMask → subType.
+        const auto slotMask = a_armor->GetSlotMask().underlying();
+        d.mainPartMask = GetMainPartMask(slotMask);
+        d.subType      = ArmorSubTypeFromPartMask(d.mainPartMask);
+
+        // Clothing/jewelry disambiguation for pieces that have WEIGHT_NONE.
+        d.weightClass = ResolveWeightClass(d.weightClass, d.mainPartMask, a_armor);
+
+        // Material from keywords.
+        d.material = GetMaterial(a_armor);
+
+        return d;
+    }
+
+    // ---------------------------------------------------------------------------
+    // Ammo
+    // ---------------------------------------------------------------------------
+    CachedItemData FormCache::BuildAmmoData(RE::TESAmmo* a_ammo) {
+        CachedItemData d;
+        d.subType = a_ammo->IsBolt() ? AmmoSubType::kBolt : AmmoSubType::kArrow;
+        d.material = GetMaterial(a_ammo->AsKeywordForm());
+        return d;
+    }
+
+    // ---------------------------------------------------------------------------
+    // Books — mirrors processBookType()
+    // ---------------------------------------------------------------------------
+    CachedItemData FormCache::BuildBookData(RE::TESObjectBOOK* a_book) {
+        CachedItemData d;
+
+        if (a_book->data.type.any(RE::OBJ_BOOK::Type::kNoteScroll)) {
+            d.subType = BookSubType::kNote;
+            return d;
+        }
+
+        d.subType = BookSubType::kBook;
+
+        if (a_book->HasKeywordString("VendorItemSpellTome"))
+            d.subType = BookSubType::kSpellTome;
+        else if (a_book->HasKeywordString("VendorItemRecipe"))
+            d.subType = BookSubType::kRecipe;
+
+        return d;
+    }
+
+    // ---------------------------------------------------------------------------
+    // Potions / Alchemy — mirrors processPotionType()
+    // ---------------------------------------------------------------------------
+    CachedItemData FormCache::BuildAlchemyData(RE::AlchemyItem* a_alchemy) {
+        CachedItemData d;
+
+        if (a_alchemy->IsFood()) {
+            // Distinguish drinkable food by the ITMPotionUse sound (0x000B6435).
+            // If it uses that sound it's a drink, otherwise generic food.
+            constexpr RE::FormID kITMPotionUse = 0x000B6435;
+            bool isDrink = false;
+            const auto& alchData = a_alchemy->data;
+            if (alchData.consumptionSound) {
+                isDrink = (alchData.consumptionSound->GetFormID() == kITMPotionUse);
+            }            d.subType = isDrink ? PotionSubType::kDrink : PotionSubType::kFood;
+            return d;
+        }
+
+        if (a_alchemy->IsPoison()) {
+            d.subType = PotionSubType::kPoison;
+            return d;
+        }
+
+        // Generic potion — identify by primary actor value of the costliest effect.
+        d.subType = PotionSubType::kPotion;  // default
+
+        // Walk effects to find the highest-cost one (matches how the game picks
+        // the actorValue it sends to Scaleform).
+        float      bestCost = -1.f;
+        RE::ActorValue bestAV = RE::ActorValue::kNone;
+        for (auto* effect : a_alchemy->effects) {
+            if (!effect || !effect->baseEffect) continue;
+            const float cost = effect->baseEffect->data.baseCost;
+            if (cost > bestCost) {
+                bestCost = cost;
+                bestAV   = effect->baseEffect->data.primaryAV;
+            }
+        }
+
+        // Map ActorValue → PotionSubType, mirroring processPotionType() in AS3.
+        switch (bestAV) {
+            case RE::ActorValue::kHealth:        d.subType = PotionSubType::kHealth;      break;
+            case RE::ActorValue::kHealRate:      d.subType = PotionSubType::kHealRate;    break;
+            case RE::ActorValue::kMagicka:       d.subType = PotionSubType::kMagicka;     break;
+            case RE::ActorValue::kMagickaRate:   d.subType = PotionSubType::kMagickaRate; break;
+            case RE::ActorValue::kStamina:       d.subType = PotionSubType::kStamina;     break;
+            case RE::ActorValue::kStaminaRate:   d.subType = PotionSubType::kStaminaRate; break;
+            default:                             break;
+        }
+
+        return d;
+    }
+
+    // ---------------------------------------------------------------------------
+    // Ingredient — subType is always undefined in AS3; nothing to compute
+    // ---------------------------------------------------------------------------
+    CachedItemData FormCache::BuildIngredientData(RE::IngredientItem*) {
+        return {};  // subType -1 ≡ AS3 undefined
+    }
+
+    // ---------------------------------------------------------------------------
+    // Key — subType is always undefined in AS3
+    // ---------------------------------------------------------------------------
+    CachedItemData FormCache::BuildKeyData(RE::TESKey*) {
+        return {};
+    }
+
+    // ---------------------------------------------------------------------------
+    // Soul gem — subType is set dynamically from soul fill state in AS3.
+    // The static fields (gem size) are set at data load; the fill state changes
+    // at runtime and must NOT be cached.
+    // ---------------------------------------------------------------------------
+    CachedItemData FormCache::BuildSoulGemData(RE::TESSoulGem*) {
+        return {};  // TODO: cache gem capacity (size) as subType when scaleform-api lands
+    }
+
+    // ---------------------------------------------------------------------------
+    // Scroll — subType undefined in AS3
+    // ---------------------------------------------------------------------------
+    CachedItemData FormCache::BuildScrollData(RE::ScrollItem*) {
+        return {};
+    }
+
+    // ---------------------------------------------------------------------------
+    // Misc — subType classification in AS3 is FormID/keyword-based and very
+    // extensive.  Full classification deferred to a future iteration.
+    // ---------------------------------------------------------------------------
+    CachedItemData FormCache::BuildMiscData(RE::TESObjectMISC*) {
+        return {};  // TODO: classify misc items (gems, ingots, ore, gold, etc.)
+    }
+
+    // ---------------------------------------------------------------------------
+    // GetMaterial — keyword-based material lookup.
+    // Mirrors processMaterialKeywords() in InventoryDataSetter.as exactly,
+    // preserving the same priority order so results match the AS3 output.
+    // ---------------------------------------------------------------------------
+    std::int32_t FormCache::GetMaterial(RE::BGSKeywordForm* a_kwForm) {
+        if (!a_kwForm) return MaterialType::kNone;
+
+        // Helper lambda: true if the form has any of the listed keyword editor IDs.
+        auto has = [&](std::initializer_list<std::string_view> kwList) {
+            for (auto kw : kwList)
+                if (a_kwForm->HasKeywordString(kw)) return true;
+            return false;
+        };
+
+        if (has({"ArmorMaterialDaedric","WeapMaterialDaedric",
+                 "ccBGSSSE025_ArmorMaterialDark","ccBGSSSE025_WeapMaterialDark",
+                 "ccBGSSSE025_ArmorMaterialGolden","ccBGSSSE025_WeapMaterialGolden"}))
+            return MaterialType::kDaedric;
+
+        if (has({"ArmorMaterialDragonplate","ArmorMaterialDragonscale",
+                 "DLC1WeapMaterialDragonbone"}))
+            return MaterialType::kDragon;
+
+        if (has({"ArmorMaterialDwarven","WeapMaterialDwarven"}))
+            return MaterialType::kDwarven;
+
+        if (has({"ArmorMaterialEbony","WeapMaterialEbony"}))
+            return MaterialType::kEbony;
+
+        if (has({"ArmorMaterialElven","WeapMaterialElven","ArmorMaterialElvenGilded"}))
+            return MaterialType::kElven;
+
+        if (has({"ArmorMaterialGlass","WeapMaterialGlass"}))
+            return MaterialType::kGlass;
+
+        if (has({"ArmorMaterialHide","ArmorMaterialScaled"}))
+            return MaterialType::kHide;
+
+        if (has({"ArmorMaterialStormcloak","ArmorMaterialBearStormcloak"}))
+            return MaterialType::kStormcloak;
+
+        if (has({"ArmorMaterialImperialHeavy","ArmorMaterialImperialLight",
+                 "WeapMaterialImperial","ArmorMaterialImperialStudded",
+                 "ArmorMaterialStudded"}))
+            return MaterialType::kImperial;
+
+        if (has({"ArmorMaterialIron","WeapMaterialIron","ArmorMaterialIronBanded"}))
+            return MaterialType::kIron;
+
+        if (has({"ArmorMaterialLeather"}))
+            return MaterialType::kLeather;
+
+        if (has({"ArmorMaterialOrcish","WeapMaterialOrcish",
+                 "ccBGSSSE055_ArmorMaterialOrcishLight"}))
+            return MaterialType::kOrcish;
+
+        if (has({"ArmorMaterialSteel","WeapMaterialSteel","ArmorMaterialSteelPlate",
+                 "WeapMaterialDraugr","WeapMaterialDraugrHoned"}))
+            return MaterialType::kSteel;
+
+        if (has({"WeapMaterialSilver"}))
+            return MaterialType::kSilver;
+
+        if (has({"ArmorMaterialFalmer","DLC1ArmorMaterialFalmerHardened",
+                 "DLC1ArmorMaterielFalmerHeavy","DLC1ArmorMaterielFalmerHeavyOriginal",
+                 "WeapMaterialFalmer","WeapMaterialFalmerHoned"}))
+            return MaterialType::kFalmer;
+
+        if (has({"DLC2ArmorMaterialBonemoldHeavy","DLC2ArmorMaterialBonemoldLight"}))
+            return MaterialType::kBonemold;
+
+        if (has({"DLC2ArmorMaterialChitinHeavy","DLC2ArmorMaterialChitinLight",
+                 "DLC2ArmorMaterialMoragTong"}))
+            return MaterialType::kChitin;
+
+        if (has({"DLC2ArmorMaterialNordicHeavy","DLC2ArmorMaterialNordicLight",
+                 "DLC2WeaponMaterialNordic"}))
+            return MaterialType::kNordic;
+
+        if (has({"DLC2ArmorMaterialStalhrimHeavy","DLC2ArmorMaterialStalhrimLight",
+                 "DLC2WeaponMaterialStalhrim"}))
+            return MaterialType::kStalhrim;
+
+        if (has({"ccASVSSE001_ArmorOrdinator","ccASVSSE001_ArmorOrdinatorIndoril"}))
+            return MaterialType::kOrdinator;
+
+        if (has({"ccBGSSSE025_ArmorMaterialAmber","ccBGSSSE025_WeapMaterialAmber"}))
+            return MaterialType::kAmber;
+
+        if (has({"ccBGSSSE025_ArmorMaterialMadness","ccBGSSSE025_WeapMaterialMadness"}))
+            return MaterialType::kMadness;
+
+        if (has({"WeapMaterialWood"}))
+            return MaterialType::kWood;
+
+        return MaterialType::kNone;
+    }
+
+    // ---------------------------------------------------------------------------
+    // GetMainPartMask — walk the PARTMASK_PRECEDENCE list and return the first
+    // set bit.  Returns 0 if partMask is empty.
+    // ---------------------------------------------------------------------------
+    std::uint32_t FormCache::GetMainPartMask(std::uint32_t a_partMask) {
+        for (auto mask : kPartMaskPrecedence)
+            if (a_partMask & mask) return mask;
+        return 0;
+    }
+
+    // ---------------------------------------------------------------------------
+    // ArmorSubTypeFromPartMask — mirrors the switch in processArmorPartMask().
+    // ---------------------------------------------------------------------------
+    std::int32_t FormCache::ArmorSubTypeFromPartMask(std::uint32_t a_mainPartMask) {
+        switch (a_mainPartMask) {
+            case PartMask::kHead:     return ArmorSubType::kHead;
+            case PartMask::kHair:     return ArmorSubType::kHair;
+            case PartMask::kLongHair: return ArmorSubType::kLongHair;
+            case PartMask::kBody:     return ArmorSubType::kBody;
+            case PartMask::kForearms: return ArmorSubType::kForearms;
+            case PartMask::kHands:    return ArmorSubType::kHands;
+            case PartMask::kShield:   return ArmorSubType::kShield;
+            case PartMask::kCalves:   return ArmorSubType::kCalves;
+            case PartMask::kFeet:     return ArmorSubType::kFeet;
+            case PartMask::kCirclet:  return ArmorSubType::kCirclet;
+            case PartMask::kAmulet:   return ArmorSubType::kAmulet;
+            case PartMask::kEars:     return ArmorSubType::kEars;
+            case PartMask::kRing:     return ArmorSubType::kRing;
+            case PartMask::kTail:     return ArmorSubType::kTail;
+            case PartMask::kCloak:    return ArmorSubType::kCloak;
+            case PartMask::kBackpack: return ArmorSubType::kBackpack;
+            default:
+                // Unnamed slots — AS3 falls back to the mask value itself.
+                return static_cast<std::int32_t>(a_mainPartMask);
+        }
+    }
+
+    // ---------------------------------------------------------------------------
+    // ResolveWeightClass — clothing/jewelry disambiguation for WEIGHT_NONE pieces.
+    // Mirrors processArmorClass() + processArmorOther() in InventoryDataSetter.as.
+    // ---------------------------------------------------------------------------
+    std::int32_t FormCache::ResolveWeightClass(std::int32_t a_engineWeightClass,
+                                               std::uint32_t a_mainPartMask,
+                                               RE::BGSKeywordForm* a_kwForm) {
+        if (a_engineWeightClass != ArmorWeightClass::kNone)
+            return a_engineWeightClass;
+
+        // Check VendorItem keywords first (processArmorClass path).
+        if (a_kwForm) {
+            if (a_kwForm->HasKeywordString("VendorItemClothing"))
+                return ArmorWeightClass::kClothing;
+            if (a_kwForm->HasKeywordString("VendorItemJewelry"))
+                return ArmorWeightClass::kJewelry;
+        }
+
+        // Fall back to slot-based classification (processArmorOther path).
+        switch (a_mainPartMask) {
+            case PartMask::kHead:
+            case PartMask::kHair:
+            case PartMask::kLongHair:
+            case PartMask::kBody:
+            case PartMask::kHands:
+            case PartMask::kForearms:
+            case PartMask::kFeet:
+            case PartMask::kCalves:
+            case PartMask::kShield:
+            case PartMask::kTail:
+            case PartMask::kCloak:
+            case PartMask::kBackpack:
+                return ArmorWeightClass::kClothing;
+
+            case PartMask::kAmulet:
+            case PartMask::kRing:
+            case PartMask::kCirclet:
+            case PartMask::kEars:
+                return ArmorWeightClass::kJewelry;
+
+            default:
+                return ArmorWeightClass::kNone;
+        }
+    }
+
+}  // namespace SkyUI

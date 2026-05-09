@@ -57,6 +57,9 @@ class InventoryDataSetter extends ItemcardDataExtender
                a_entryObject.weightClassDisplay = this.getWeightClassDisplay(a_entryObject.weightClass);
                a_entryObject.material = _sd.material >= 0 ? _sd.material : null;
                a_entryObject.materialDisplay = this.getMaterialDisplay(a_entryObject.material);
+               // processArmorBaseId handles base-game items (Wedding Wreath, Vampire Lord
+               // armor, etc.) and CC items that lack keywords, classified by FormID only.
+               this.processArmorBaseId(a_entryObject);
             } else {
                _perfSlowCount++;
                this.processArmorClass(a_entryObject);
@@ -113,6 +116,9 @@ class InventoryDataSetter extends ItemcardDataExtender
                a_entryObject.subTypeDisplay = _sd.subType >= 0 ? this.getWeaponSubTypeDisplay(_sd.subType) : skyui.util.Translator.translate("$Weapon");
                a_entryObject.material = _sd.material >= 0 ? _sd.material : null;
                a_entryObject.materialDisplay = this.getMaterialDisplay(a_entryObject.material);
+               // processWeaponBaseId handles base-game items (pickaxes, wood axes, wood bows)
+               // that lack material keywords and are classified by FormID only.
+               this.processWeaponBaseId(a_entryObject);
             } else {
                _perfSlowCount++;
                this.processWeaponType(a_entryObject);
@@ -129,6 +135,9 @@ class InventoryDataSetter extends ItemcardDataExtender
                a_entryObject.subTypeDisplay = this.getAmmoSubTypeDisplay(_sd.subType);
                a_entryObject.material = _sd.material >= 0 ? _sd.material : null;
                a_entryObject.materialDisplay = this.getMaterialDisplay(a_entryObject.material);
+               // processAmmoBaseId handles base-game arrows (Daedric, Ebony, Glass, etc.)
+               // that lack material keywords and are classified by FormID only.
+               this.processAmmoBaseId(a_entryObject);
             } else {
                _perfSlowCount++;
                this.processAmmoType(a_entryObject);

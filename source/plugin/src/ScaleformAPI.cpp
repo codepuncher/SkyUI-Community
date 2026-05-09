@@ -8,7 +8,7 @@ namespace SkyUI {
     //   SkyUI_SE_GetStaticData(formId: uint) : Object
     //
     // Returns an object with static, form-derived fields for the given formId:
-    //   { subType, material, weightClass, mainPartMask, iconLabel, iconColor }
+    //   { subType, material, weightClass, mainPartMask }
     // Returns undefined on cache miss (item not yet seen in inventory).
     //
     // All integer values match skyui.defines.* constants exactly, so the AS3
@@ -48,16 +48,6 @@ namespace SkyUI {
 
             val.SetNumber(static_cast<double>(data->mainPartMask));
             a_params.retVal->SetMember("mainPartMask", val);
-
-            if (!data->iconLabel.empty()) {
-                a_params.movie->CreateString(&val, data->iconLabel.c_str());
-                a_params.retVal->SetMember("iconLabel", val);
-            }
-
-            if (data->iconColor != 0) {
-                val.SetNumber(static_cast<double>(data->iconColor));
-                a_params.retVal->SetMember("iconColor", val);
-            }
         }
     };
 

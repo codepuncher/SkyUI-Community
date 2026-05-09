@@ -127,8 +127,6 @@ namespace SkyUI {
         std::int32_t  material{ -1 };      // MaterialType::k* constant, -1 = none
         std::int32_t  weightClass{ -1 };   // ArmorWeightClass::k*, -1 = not armor
         std::uint32_t mainPartMask{ 0 };   // dominant biped slot bitmask (armor only)
-        std::string   iconLabel;           // e.g. "weapon_sword", "armor_body_light"
-        std::uint32_t iconColor{ 0 };      // 0xRRGGBB (0 = no override)
     };
 
     // ---------------------------------------------------------------------------

@@ -132,9 +132,18 @@ class InventoryDataSetter extends ItemcardDataExtender
             this.processPotionBaseId(a_entryObject);
             break;
          case skyui.defines.Form.TYPE_SOULGEM:
-            this.processSoulGemType(a_entryObject);
-            this.processSoulGemStatus(a_entryObject);
-            this.processSoulGemBaseId(a_entryObject);
+            if (_sd != undefined) {
+               _perfFastCount++;
+               a_entryObject.subType = _sd.subType >= 0 ? _sd.subType : null;
+               a_entryObject.subTypeDisplay = skyui.util.Translator.translate("$Soul Gem");
+               this.processSoulGemStatus(a_entryObject);
+            } else {
+               _perfSlowCount++;
+               this.processSoulGemType(a_entryObject);
+               this.processSoulGemStatus(a_entryObject);
+               this.processSoulGemBaseId(a_entryObject);
+            }
+            break;
          default:
             return;
       }

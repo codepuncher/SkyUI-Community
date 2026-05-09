@@ -95,6 +95,17 @@ namespace SkyUI {
         inline constexpr std::int32_t kNone       = -1;
     }
 
+    // skyui.defines.Item SOULGEM_* constants
+    namespace SoulGemSubType {
+        inline constexpr std::int32_t kPetty      = 1;
+        inline constexpr std::int32_t kLesser     = 2;
+        inline constexpr std::int32_t kCommon     = 3;
+        inline constexpr std::int32_t kGreater    = 4;
+        inline constexpr std::int32_t kGrand      = 5;
+        inline constexpr std::int32_t kAzura      = 6;
+        inline constexpr std::int32_t kSoulTomato = 7;
+    }
+
     // skyui.defines.Item MISC_* constants
     namespace MiscSubType {
         inline constexpr std::int32_t kGem              = 0;

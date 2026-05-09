@@ -344,12 +344,50 @@ namespace SkyUI {
     }
 
     // ---------------------------------------------------------------------------
-    // Soul gem — subType is set dynamically from soul fill state in AS3.
-    // The static fields (gem size) are set at data load; the fill state changes
-    // at runtime and must NOT be cached.
+    // Soul gem — subType is set from the gem's maximum capacity (static), which
+    // maps directly to the SOULGEM_* constants.  The fill state (soulSize/status)
+    // changes at runtime and must NOT be cached — processSoulGemStatus() is still
+    // called in the fast path to compute status from the live gemSize/soulSize.
     // ---------------------------------------------------------------------------
-    CachedItemData FormCache::BuildSoulGemData(RE::TESSoulGem*) {
-        return {};  // TODO: cache gem capacity (size) as subType when scaleform-api lands
+
+    // FormID table for soul gem special cases (mirrors processSoulGemBaseId() in AS2).
+    static std::optional<std::int32_t> GetSoulGemSubTypeFromFormID(RE::FormID a_formID) {
+        static const auto s_table = []() {
+            std::unordered_map<RE::FormID, std::int32_t> table;
+            auto* dh = RE::TESDataHandler::GetSingleton();
+            if (!dh) return table;
+
+            auto add = [&](std::string_view plugin, RE::FormID localId, std::int32_t subType) {
+                if (auto* form = dh->LookupForm(localId, plugin))
+                    table.emplace(form->GetFormID(), subType);
+            };
+
+            // Azura's Star and The Black Star → SOULGEM_AZURA
+            add("Skyrim.esm", 0x063B27, SoulGemSubType::kAzura);
+            add("Skyrim.esm", 0x063B29, SoulGemSubType::kAzura);
+
+            // CC Soul Tomato skipped — CC plugin filenames are not reliably stable.
+
+            return table;
+        }();
+
+        const auto it = s_table.find(a_formID);
+        return (it != s_table.end()) ? std::optional(it->second) : std::nullopt;
+    }
+
+    CachedItemData FormCache::BuildSoulGemData(RE::TESSoulGem* a_soulGem) {
+        CachedItemData d;
+
+        // subType = maximum soul capacity — maps directly to SOULGEM_PETTY..SOULGEM_GRAND.
+        const auto capacity = static_cast<std::int32_t>(a_soulGem->GetMaximumCapacity());
+        if (capacity >= SoulGemSubType::kPetty && capacity <= SoulGemSubType::kGrand)
+            d.subType = capacity;
+
+        // FormID-based overrides (Azura's Star, Black Star).
+        if (auto override = GetSoulGemSubTypeFromFormID(a_soulGem->GetFormID()))
+            d.subType = *override;
+
+        return d;
     }
 
     // ---------------------------------------------------------------------------
@@ -586,10 +624,10 @@ namespace SkyUI {
     }
 
     void FormCache::Initialize() {
-        // Trigger the one-time static initialization of the misc FormID lookup
-        // table on the main thread (kDataLoaded), before Populate() can be
-        // called concurrently from inventory opens.
+        // Trigger one-time static initialization of all FormID lookup tables on the
+        // main thread (kDataLoaded), before Populate() can be called concurrently.
         GetMiscSubTypeFromFormID(0);
+        GetSoulGemSubTypeFromFormID(0);
     }
 
     // ---------------------------------------------------------------------------

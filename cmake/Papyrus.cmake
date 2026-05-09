@@ -46,34 +46,6 @@ Example:
               OPTIMIZE RELEASE FINAL)
 #]=======================================================================]
 
-macro(Papyrus_FindCaprica)
-	find_program(PAPYRUS_COMPILER "Caprica" PATHS "tools/Caprica" NO_CACHE)
-
-	if(NOT PAPYRUS_COMPILER)
-		set(CAPRICA_DOWNLOAD "${CMAKE_CURRENT_BINARY_DIR}/download/Caprica.v0.3.0.7z")
-
-		file(DOWNLOAD
-			"https://github.com/Orvid/Caprica/releases/download/v0.3.0/Caprica.v0.3.0.7z"
-			"${CAPRICA_DOWNLOAD}"
-			EXPECTED_HASH SHA3_224=4224c861424e8e4dc20ffc45cc605200035f897771af158c1459c021
-			STATUS CAPRICA_STATUS
-		)
-
-		list(GET CAPRICA_STATUS 0 CAPRICA_ERROR_CODE)
-		if(CAPRICA_ERROR_CODE)
-			list(GET CAPRICA_STATUS 1 CAPRICA_ERROR_MESSAGE)
-			message(FATAL_ERROR "${CAPRICA_ERROR_MESSAGE}")
-		endif()
-
-		file(ARCHIVE_EXTRACT
-			INPUT "${CAPRICA_DOWNLOAD}"
-			DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/tools/Caprica"
-		)
-
-		set(PAPYRUS_COMPILER "${CMAKE_CURRENT_BINARY_DIR}/tools/Caprica/Caprica.exe")
-	endif()
-endmacro()
-
 macro(Papyrus_FindPexAnon)
 	find_program(PEXANON_COMMAND "AFKPexAnon" PATHS "tools/AFKPexAnon" NO_CACHE)
 
@@ -99,6 +71,7 @@ macro(Papyrus_FindPexAnon)
 		)
 
 		set(PEXANON_COMMAND "${CMAKE_CURRENT_BINARY_DIR}/tools/AFKPexAnon/AFKPexAnon.exe")
+		file(CHMOD "${PEXANON_COMMAND}" PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 	endif()
 endmacro()
 
@@ -122,7 +95,6 @@ function(Papyrus_Add PAPYRUS_TARGET)
 		message(FATAL_ERROR "Invalid Papyrus_Add mode specified.")
 	endif()
 
-	set(QUOTE_LITERAL [=["]=])
 	list(APPEND PAPYRUS_IMPORT_DIR "${PAPYRUS_IMPORTS}")
 	if(PAPYRUS_GAME AND NOT PAPYRUS_SKIP_DEFAULT_IMPORTS)
 		if(IS_SKYRIM)
@@ -143,100 +115,57 @@ function(Papyrus_Add PAPYRUS_TARGET)
 			)
 		endif()
 	endif()
-	string(APPEND PAPYRUS_IMPORT_ARG ${QUOTE_LITERAL} "${PAPYRUS_IMPORT_DIR}" ${QUOTE_LITERAL})
 
 	set(PAPYRUS_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/Scripts")
-	string(APPEND PAPYRUS_OUTPUT_ARG ${QUOTE_LITERAL} "${PAPYRUS_OUTPUT_DIR}" ${QUOTE_LITERAL})
+
+	set(PAPYRUS_COMPILER "${PAPYRUS_GAME}/Papyrus Compiler/PapyrusCompiler.exe")
+
+	# Build args as a CMake list so each element becomes a separate process
+	# argument on all platforms (string(APPEND) produces one giant arg on Linux).
+	string(REPLACE ";" "\\;" _papyrus_import_escaped "${PAPYRUS_IMPORT_DIR}")
+	list(APPEND PAPYRUS_COMPILER_ARGS "-import=${_papyrus_import_escaped}")
+	list(APPEND PAPYRUS_COMPILER_ARGS "-output=${PAPYRUS_OUTPUT_DIR}")
 
 	if(PAPYRUS_FLAGS)
-		string(APPEND PAPYRUS_FLAGS_ARG ${QUOTE_LITERAL} "${PAPYRUS_FLAGS}" ${QUOTE_LITERAL})
-	else()
-		if(IS_SKYRIM OR IS_SKYRIMSE)
-			string(APPEND PAPYRUS_FLAGS_ARG ${QUOTE_LITERAL} "TESV_Papyrus_Flags.flg" ${QUOTE_LITERAL})
-		elseif(IS_FALLOUT4)
-			string(APPEND PAPYRUS_FLAGS_ARG ${QUOTE_LITERAL} "Institute_Papyrus_Flags.flg" ${QUOTE_LITERAL})
-		endif()
+		list(APPEND PAPYRUS_COMPILER_ARGS "-flags=${PAPYRUS_FLAGS}")
+	elseif(IS_SKYRIM OR IS_SKYRIMSE)
+		list(APPEND PAPYRUS_COMPILER_ARGS "-flags=TESV_Papyrus_Flags.flg")
+	elseif(IS_FALLOUT4)
+		list(APPEND PAPYRUS_COMPILER_ARGS "-flags=Institute_Papyrus_Flags.flg")
 	endif()
 
-	if(PAPYRUS_GAME)
-		set(PAPYRUS_COMPILER "${PAPYRUS_GAME}/Papyrus Compiler/PapyrusCompiler.exe")
-
-		string(
-			APPEND
-			PAPYRUS_COMPILER_ARGS
-			"-import=${PAPYRUS_IMPORT_ARG} -output=${PAPYRUS_OUTPUT_ARG} -flags=${PAPYRUS_FLAGS_ARG}")
-
-		if(PAPYRUS_FINAL)
-			if(IS_FALLOUT4)
-				string(APPEND PAPYRUS_COMPILER_ARGS " -optimize -release -final")
-			else()
-				string(APPEND PAPYRUS_COMPILER_ARGS " -optimize")
-			endif()
-		elseif(PAPYRUS_RELEASE)
-			if(IS_FALLOUT4)
-				string(APPEND PAPYRUS_COMPILER_ARGS " -optimize -release")
-			else()
-				string(APPEND PAPYRUS_COMPILER_ARGS " -optimize")
-			endif()
-		elseif(PAPYRUS_OPTIMIZE)
-			string(APPEND PAPYRUS_COMPILER_ARGS " -optimize")
+	if(PAPYRUS_FINAL)
+		if(IS_FALLOUT4)
+			list(APPEND PAPYRUS_COMPILER_ARGS "-optimize" "-release" "-final")
+		else()
+			list(APPEND PAPYRUS_COMPILER_ARGS "-optimize")
 		endif()
+	elseif(PAPYRUS_RELEASE OR PAPYRUS_OPTIMIZE)
+		list(APPEND PAPYRUS_COMPILER_ARGS "-optimize")
+	endif()
 
-		if(NOT PAPYRUS_VERBOSE)
-			string(APPEND PAPYRUS_COMPILER_ARGS " -quiet")
-		endif()
-	else()
-		Papyrus_FindCaprica()
-
-		# Build args as a CMake list so each element becomes a separate process
-		# argument on all platforms (string(APPEND) produces one giant arg on Linux).
-		if(IS_SKYRIM OR IS_SKYRIMSE)
-			list(APPEND PAPYRUS_COMPILER_ARGS "--game=skyrim")
-		elseif(IS_FALLOUT4)
-			list(APPEND PAPYRUS_COMPILER_ARGS "--game=fallout4")
-		elseif(IS_FALLOUT76)
-			list(APPEND PAPYRUS_COMPILER_ARGS "--game=fallout76")
-		elseif(IS_STARFIELD)
-			list(APPEND PAPYRUS_COMPILER_ARGS "--game=starfield")
-		endif()
-
-		# PAPYRUS_IMPORT_DIR is a CMake list; escape semicolons so the whole
-		# value is one list element (and thus one process argument).
-		string(REPLACE ";" "\\;" _papyrus_import_escaped "${PAPYRUS_IMPORT_DIR}")
-		list(APPEND PAPYRUS_COMPILER_ARGS "--import=${_papyrus_import_escaped}")
-		list(APPEND PAPYRUS_COMPILER_ARGS "--output=${PAPYRUS_OUTPUT_DIR}")
-
-		if(PAPYRUS_FLAGS)
-			list(APPEND PAPYRUS_COMPILER_ARGS "--flags=${PAPYRUS_FLAGS}")
-		elseif(IS_SKYRIM OR IS_SKYRIMSE)
-			list(APPEND PAPYRUS_COMPILER_ARGS "--flags=TESV_Papyrus_Flags.flg")
-		elseif(IS_FALLOUT4)
-			list(APPEND PAPYRUS_COMPILER_ARGS "--flags=Institute_Papyrus_Flags.flg")
-		endif()
-
-		if(PAPYRUS_FINAL)
-			list(APPEND PAPYRUS_COMPILER_ARGS "--optimize" "--release" "--final")
-		elseif(PAPYRUS_RELEASE OR PAPYRUS_OPTIMIZE)
-			list(APPEND PAPYRUS_COMPILER_ARGS "--optimize")
-		endif()
-
-		if(NOT PAPYRUS_VERBOSE AND NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
-			list(APPEND PAPYRUS_COMPILER_ARGS "--quiet")
-		endif()
+	if(NOT PAPYRUS_VERBOSE)
+		list(APPEND PAPYRUS_COMPILER_ARGS "-quiet")
 	endif()
 
 	foreach(SOURCE IN ITEMS ${PAPYRUS_SOURCES})
 		cmake_path(GET SOURCE STEM LAST_ONLY SOURCE_FILENAME)
+		cmake_path(GET SOURCE PARENT_PATH SOURCE_DIR)
+		cmake_path(GET SOURCE FILENAME SOURCE_BASENAME)
 		cmake_path(REPLACE_EXTENSION SOURCE_FILENAME LAST_ONLY "pex" OUTPUT_VARIABLE OUTPUT_FILENAME)
 		cmake_path(APPEND PAPYRUS_OUTPUT_DIR "${OUTPUT_FILENAME}" OUTPUT_VARIABLE OUTPUT_FILE)
 		list(APPEND PAPYRUS_OUTPUT "${OUTPUT_FILE}")
 
+		# Pass just the filename with WORKING_DIRECTORY set to the source dir so
+		# that Wine-hosted PapyrusCompiler.exe on Linux resolves the source path
+		# via Win32 APIs, producing a Z:\ path consistent with the import dirs.
 		add_custom_command(
 			OUTPUT "${OUTPUT_FILE}"
 			COMMAND "${PAPYRUS_COMPILER}"
-				"${SOURCE}"
+				"${SOURCE_BASENAME}"
 				${PAPYRUS_COMPILER_ARGS}
 			DEPENDS "${SOURCE}"
+			WORKING_DIRECTORY "${SOURCE_DIR}"
 			VERBATIM
 		)
 	endforeach()
@@ -245,6 +174,7 @@ function(Papyrus_Add PAPYRUS_TARGET)
 	add_custom_command(
 		OUTPUT "${_DUMMY}"
 		DEPENDS ${PAPYRUS_OUTPUT}
+		COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/_Papyrus"
 		COMMAND "${CMAKE_COMMAND}" -E touch "${_DUMMY}"
 		VERBATIM
 	)

@@ -1,5 +1,6 @@
 #include "ScaleformAPI.h"
 #include "FormCache.h"
+#include "Plugin.h"
 
 namespace SkyUI {
 
@@ -89,18 +90,19 @@ namespace SkyUI {
         a_view->CreateFunction(&fnLog, new LogFn());
 
         // Register on _root (for any timeline/MovieClip code)
-        a_root->SetMember("SkyUI_SE_GetStaticData", fnGetStaticData);
-        a_root->SetMember("SkyUI_SE_Log", fnLog);
+        a_root->SetMember(Plugin::kFnGetStaticData, fnGetStaticData);
+        a_root->SetMember(Plugin::kFnLog, fnLog);
 
         // Also register on _global so plain class instances can reach them
         RE::GFxValue globalObj;
         a_view->GetVariable(&globalObj, "_global");
         if (globalObj.IsObject()) {
-            globalObj.SetMember("SkyUI_SE_GetStaticData", fnGetStaticData);
-            globalObj.SetMember("SkyUI_SE_Log", fnLog);
+            globalObj.SetMember(Plugin::kFnGetStaticData, fnGetStaticData);
+            globalObj.SetMember(Plugin::kFnLog, fnLog);
         }
 
-        logger::debug("ScaleformAPI: registered SkyUI_SE_GetStaticData in {}",
+        logger::debug("ScaleformAPI: registered {} in {}",
+                      Plugin::kFnGetStaticData,
                       a_view->GetMovieDef() ? a_view->GetMovieDef()->GetFileURL() : "unknown");
 
         return true;

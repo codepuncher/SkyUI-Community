@@ -5,6 +5,10 @@ class InventoryDataSetter extends ItemcardDataExtender
    // (i.e. each inventory open that contains items not yet seen this session).
    var _perfFastCount = 0;
    var _perfSlowCount = 0;
+   // Cached references to SKSE plugin Scaleform functions — set once per processList
+   // call so each processEntry does a cheap instance-variable read, not a _global lookup.
+   var _getStaticData;
+   var _log;
    function InventoryDataSetter()
    {
       super();
@@ -12,14 +16,16 @@ class InventoryDataSetter extends ItemcardDataExtender
    // Override processList to time the full classification pass and log results.
    function processList(a_list)
    {
+      _getStaticData = _global.SkyUI_SE_GetStaticData;
+      _log = _global.SkyUI_SE_Log;
       _perfFastCount = 0;
       _perfSlowCount = 0;
       var _t0 = getTimer();
       super.processList(a_list);
       var _elapsed = getTimer() - _t0;
       var _total = _perfFastCount + _perfSlowCount;
-      if (_total > 0 && _global["SkyUI_SE_Log"] != undefined) {
-         _global.SkyUI_SE_Log("processList: " + _elapsed + "ms | " + _total + " items | fast=" + _perfFastCount + " slow=" + _perfSlowCount);
+      if (_total > 0 && _log != undefined) {
+         _log("processList: " + _elapsed + "ms | " + _total + " items | fast=" + _perfFastCount + " slow=" + _perfSlowCount);
       }
    }
    function processEntry(a_entryObject, a_itemInfo)
@@ -34,8 +40,8 @@ class InventoryDataSetter extends ItemcardDataExtender
       a_entryObject.infoValueWeight = !(a_itemInfo.weight > 0 && a_itemInfo.value > 0) ? null : Math.round(a_itemInfo.value / a_itemInfo.weight);
       // Fast path: static item data pre-computed in C++ by SkyUI_SE.dll.
       // Falls back to the original keyword-lookup path on cache miss.
-      var _sd = (_global["SkyUI_SE_GetStaticData"] != undefined)
-                   ? _global.SkyUI_SE_GetStaticData(a_entryObject.formId)
+      var _sd = (_getStaticData != undefined)
+                   ? _getStaticData(a_entryObject.formId)
                    : undefined;
       switch(a_entryObject.formType)
       {

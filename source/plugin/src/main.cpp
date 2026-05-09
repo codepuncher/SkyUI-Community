@@ -1,6 +1,7 @@
 #include "PCH.h"
 #include "EventSink.h"
 #include "FormCache.h"
+#include "Plugin.h"
 #include "ScaleformAPI.h"
 
 namespace {
@@ -27,9 +28,9 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse) {
 
     auto path = logger::log_directory();
     if (!path) return false;
-    *path /= "SkyUI_SE.log";
+    *path /= (std::string(SkyUI::Plugin::kName) + ".log");
     auto sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(path->string(), true);
-    auto log  = std::make_shared<spdlog::logger>("SkyUI_SE", std::move(sink));
+    auto log  = std::make_shared<spdlog::logger>(SkyUI::Plugin::kName, std::move(sink));
     log->set_level(spdlog::level::debug);
     log->flush_on(spdlog::level::debug);
     spdlog::set_default_logger(std::move(log));
@@ -38,9 +39,9 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse) {
     messaging->RegisterListener(MessageHandler);
 
     auto* scaleform = SKSE::GetScaleformInterface();
-    scaleform->Register(SkyUI::ScaleformRegisterCallback, "SkyUI_SE");
+    scaleform->Register(SkyUI::ScaleformRegisterCallback, SkyUI::Plugin::kName);
 
-    logger::info("SkyUI_SE plugin v{} loaded", SKSE::PluginDeclaration::GetSingleton()->GetVersion().string());
+    logger::info("{} plugin v{} loaded", SkyUI::Plugin::kName, SKSE::PluginDeclaration::GetSingleton()->GetVersion().string());
 
     return true;
 }

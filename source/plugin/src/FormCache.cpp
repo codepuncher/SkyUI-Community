@@ -368,15 +368,21 @@ namespace SkyUI {
     //
     // localId is the plugin-local FormID (lower 24 bits only; no plugin-index byte).
     // ---------------------------------------------------------------------------
-    static std::optional<std::int32_t> GetMiscSubTypeFromFormID(RE::FormID a_formID) {
+    struct MiscOverride {
+        std::int32_t subType;
+        const char*  displayKey{ nullptr };
+    };
+
+    static std::optional<MiscOverride> GetMiscSubTypeFromFormID(RE::FormID a_formID) {
         static const auto s_table = []() {
-            std::unordered_map<RE::FormID, std::int32_t> table;
+            std::unordered_map<RE::FormID, MiscOverride> table;
             auto* dh = RE::TESDataHandler::GetSingleton();
             if (!dh) return table;
 
-            auto add = [&](std::string_view plugin, RE::FormID localId, std::int32_t subType) {
+            auto add = [&](std::string_view plugin, RE::FormID localId, std::int32_t subType,
+                           const char* displayKey = nullptr) {
                 if (auto* form = dh->LookupForm(localId, plugin))
-                    table.emplace(form->GetFormID(), subType);
+                    table.emplace(form->GetFormID(), MiscOverride{subType, displayKey});
             };
 
             // --- Skyrim.esm ---
@@ -528,16 +534,19 @@ namespace SkyUI {
             add("Dawnguard.esm", 0x0195AA, MiscSubType::kNetchLeather);
 
             // --- HearthFires.esm --- house parts (10)
-            add("HearthFires.esm", 0x003043, MiscSubType::kHousePart);
-            add("HearthFires.esm", 0x003035, MiscSubType::kHousePart);
-            add("HearthFires.esm", 0x005A69, MiscSubType::kHousePart);
-            add("HearthFires.esm", 0x003011, MiscSubType::kHousePart);
-            add("HearthFires.esm", 0x00303F, MiscSubType::kHousePart);
-            add("HearthFires.esm", 0x003012, MiscSubType::kHousePart);
-            add("HearthFires.esm", 0x00300E, MiscSubType::kHousePart);
-            add("HearthFires.esm", 0x00300F, MiscSubType::kHousePart);
-            add("HearthFires.esm", 0x00306C, MiscSubType::kHousePart);
-            add("HearthFires.esm", 0x005A68, MiscSubType::kHousePart);
+            // These items are also caught by BYOH crafting keywords (phase 1 → "$House Part"),
+            // but processMiscBaseId() in AS2 overrides their display to "$BuildingMaterial".
+            // The displayKey here propagates that override through the fast path.
+            add("HearthFires.esm", 0x003043, MiscSubType::kHousePart, "$BuildingMaterial");
+            add("HearthFires.esm", 0x003035, MiscSubType::kHousePart, "$BuildingMaterial");
+            add("HearthFires.esm", 0x005A69, MiscSubType::kHousePart, "$BuildingMaterial");
+            add("HearthFires.esm", 0x003011, MiscSubType::kHousePart, "$BuildingMaterial");
+            add("HearthFires.esm", 0x00303F, MiscSubType::kHousePart, "$BuildingMaterial");
+            add("HearthFires.esm", 0x003012, MiscSubType::kHousePart, "$BuildingMaterial");
+            add("HearthFires.esm", 0x00300E, MiscSubType::kHousePart, "$BuildingMaterial");
+            add("HearthFires.esm", 0x00300F, MiscSubType::kHousePart, "$BuildingMaterial");
+            add("HearthFires.esm", 0x00306C, MiscSubType::kHousePart, "$BuildingMaterial");
+            add("HearthFires.esm", 0x005A68, MiscSubType::kHousePart, "$BuildingMaterial");
 
             // --- Dragonborn.esm ---
             // Dragon claws
@@ -632,8 +641,10 @@ namespace SkyUI {
 
         // Phase 2: FormID-based overrides.
         // Applied on top of phase 1 result, mirroring processMiscBaseId() in AS2.
-        if (auto override = GetMiscSubTypeFromFormID(a_misc->GetFormID()))
-            d.subType = *override;
+        if (auto override = GetMiscSubTypeFromFormID(a_misc->GetFormID())) {
+            d.subType          = override->subType;
+            d.subTypeDisplayKey = override->displayKey;  // null for most items
+        }
 
         return d;
     }

@@ -168,10 +168,11 @@ namespace SkyUI {
     // with a given form, then served from cache on every subsequent open.
     // ---------------------------------------------------------------------------
     struct CachedItemData {
-        std::int32_t  subType{ -1 };       // weapon/armor/book/potion type constant
-        std::int32_t  material{ -1 };      // MaterialType::k* constant, -1 = none
-        std::int32_t  weightClass{ -1 };   // ArmorWeightClass::k*, -1 = not armor
-        std::uint32_t mainPartMask{ 0 };   // dominant biped slot bitmask (armor only)
+        std::int32_t  subType{ -1 };              // weapon/armor/book/potion type constant
+        std::int32_t  material{ -1 };             // MaterialType::k* constant, -1 = none
+        std::int32_t  weightClass{ -1 };          // ArmorWeightClass::k*, -1 = not armor
+        std::uint32_t mainPartMask{ 0 };          // dominant biped slot bitmask (armor only)
+        const char*   subTypeDisplayKey{ nullptr }; // translation key overriding getMiscSubTypeDisplay, or null
     };
 
     // ---------------------------------------------------------------------------

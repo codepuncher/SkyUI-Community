@@ -48,6 +48,11 @@ namespace SkyUI {
 
             val.SetNumber(static_cast<double>(data->mainPartMask));
             a_params.retVal->SetMember("mainPartMask", val);
+
+            if (data->subTypeDisplayKey) {
+                val.SetString(data->subTypeDisplayKey);
+                a_params.retVal->SetMember("subTypeDisplay", val);
+            }
         }
     };
 

@@ -77,8 +77,17 @@ class InventoryDataSetter extends ItemcardDataExtender
             a_entryObject.subTypeDisplay = skyui.util.Translator.translate("$Torch");
             break;
          case skyui.defines.Form.TYPE_MISC:
-            this.processMiscType(a_entryObject);
-            this.processMiscBaseId(a_entryObject);
+            if (_sd != undefined) {
+               _perfFastCount++;
+               a_entryObject.subType = _sd.subType >= 0 ? _sd.subType : null;
+               a_entryObject.subTypeDisplay = _sd.subTypeDisplay !== undefined
+                  ? skyui.util.Translator.translate(_sd.subTypeDisplay)
+                  : this.getMiscSubTypeDisplay(_sd.subType);
+            } else {
+               _perfSlowCount++;
+               this.processMiscType(a_entryObject);
+               this.processMiscBaseId(a_entryObject);
+            }
             break;
          case skyui.defines.Form.TYPE_WEAPON:
             a_entryObject.isEnchanted = a_itemInfo.effects != "";
@@ -1441,15 +1450,45 @@ class InventoryDataSetter extends ItemcardDataExtender
          default:                                return skyui.util.Translator.translate("$Other");
       }
    }
-   function getWeightClassDisplay(a_weightClass)
+   function getMiscSubTypeDisplay(a_subType)
    {
-      switch(a_weightClass)
+      switch(a_subType)
       {
-         case skyui.defines.Armor.WEIGHT_LIGHT:    return skyui.util.Translator.translate("$Light");
-         case skyui.defines.Armor.WEIGHT_HEAVY:    return skyui.util.Translator.translate("$Heavy");
-         case skyui.defines.Armor.WEIGHT_CLOTHING: return skyui.util.Translator.translate("$Clothing");
-         case skyui.defines.Armor.WEIGHT_JEWELRY:  return skyui.util.Translator.translate("$Jewelry");
-         default:                                  return skyui.util.Translator.translate("$Other");
+         case skyui.defines.Item.MISC_GEM:              return skyui.util.Translator.translate("$Gem");
+         case skyui.defines.Item.MISC_DRAGONCLAW:       return skyui.util.Translator.translate("$Claw");
+         case skyui.defines.Item.MISC_ARTIFACT:         return skyui.util.Translator.translate("$Artifact");
+         case skyui.defines.Item.MISC_LEATHER:          return skyui.util.Translator.translate("$Leather");
+         case skyui.defines.Item.MISC_LEATHERSTRIPS:    return skyui.util.Translator.translate("$Strips");
+         case skyui.defines.Item.MISC_HIDE:             return skyui.util.Translator.translate("$Hide");
+         case skyui.defines.Item.MISC_REMAINS:          return skyui.util.Translator.translate("$Remains");
+         case skyui.defines.Item.MISC_INGOT:            return skyui.util.Translator.translate("$Ingot");
+         case skyui.defines.Item.MISC_TOOL:             return skyui.util.Translator.translate("$Tool");
+         case skyui.defines.Item.MISC_CHILDRENSCLOTHES: return skyui.util.Translator.translate("$Clothing");
+         case skyui.defines.Item.MISC_TOY:              return skyui.util.Translator.translate("$Toy");
+         case skyui.defines.Item.MISC_FIREWOOD:         return skyui.util.Translator.translate("$Firewood");
+         case skyui.defines.Item.MISC_HOUSEPART:        return skyui.util.Translator.translate("$House Part");
+         case skyui.defines.Item.MISC_CLUTTER:          return skyui.util.Translator.translate("$Clutter");
+         case skyui.defines.Item.MISC_LOCKPICK:         return skyui.util.Translator.translate("$Lockpick");
+         case skyui.defines.Item.MISC_GOLD:             return skyui.util.Translator.translate("$Gold");
+         case skyui.defines.Item.MISC_TROLLSKULL:       return skyui.util.Translator.translate("$Remains");
+         case skyui.defines.Item.MISC_NETCHLEATHER:     return skyui.util.Translator.translate("$NetchLeather");
+         case skyui.defines.Item.MISC_AYLEIDCRYSTAL:    return skyui.util.Translator.translate("$AyleidCrystal");
+         case skyui.defines.Item.MISC_HORSETACK:        return skyui.util.Translator.translate("$HorseTack");
+         case skyui.defines.Item.MISC_BROKENWEAPON:     return skyui.util.Translator.translate("$BrokenWeapon");
+         case skyui.defines.Item.MISC_DWARVENSCRAP:     return skyui.util.Translator.translate("$DwarvenScrap");
+         case skyui.defines.Item.MISC_INSTRUMENT:       return skyui.util.Translator.translate("$Instrument");
+         case skyui.defines.Item.MISC_BUGJAR:           return skyui.util.Translator.translate("$BugJar");
+         case skyui.defines.Item.MISC_SCROLLSPIDER:     return skyui.util.Translator.translate("$ScrollSpider");
+         case skyui.defines.Item.MISC_ORE:              return skyui.util.Translator.translate("$Ore");
+         case skyui.defines.Item.MISC_MAP:              return skyui.util.Translator.translate("$Map");
+         case skyui.defines.Item.MISC_POTION:           return skyui.util.Translator.translate("$Potion");
+         case skyui.defines.Item.MISC_POISON:           return skyui.util.Translator.translate("$Poison");
+         case skyui.defines.Item.MISC_SCROLL:           return skyui.util.Translator.translate("$Scroll");
+         case skyui.defines.Item.MISC_BOOK:             return skyui.util.Translator.translate("$Book");
+         case skyui.defines.Item.MISC_RING:             return skyui.util.Translator.translate("$Ring");
+         case skyui.defines.Item.MISC_INGREDIENT:       return skyui.util.Translator.translate("$Ingredient");
+         case skyui.defines.Item.MISC_PETGEAR:          return skyui.util.Translator.translate("$PetGear");
+         default:                                       return skyui.util.Translator.translate("$Misc");
       }
    }
 }

@@ -72,6 +72,9 @@ class InventoryDataSetter extends ItemcardDataExtender
                _perfFastCount++;
                a_entryObject.subType = _sd.subType >= 0 ? _sd.subType : null;
                a_entryObject.subTypeDisplay = this.getBookSubTypeDisplay(_sd.subType);
+               // processBookBaseId handles CC fish maps by baseId;
+               // those cannot be classified in C++ (CC plugin filename is unstable).
+               this.processBookBaseId(a_entryObject);
             } else {
                _perfSlowCount++;
                this.processBookType(a_entryObject);
@@ -91,6 +94,9 @@ class InventoryDataSetter extends ItemcardDataExtender
                a_entryObject.subTypeDisplay = _sd.subTypeDisplay !== undefined
                   ? skyui.util.Translator.translate(_sd.subTypeDisplay)
                   : this.getMiscSubTypeDisplay(_sd.subType);
+               // processMiscBaseId handles CC misc items (gems, crystals, bug jars, etc.)
+               // by baseId; those cannot be classified in C++ (CC plugin filename is unstable).
+               this.processMiscBaseId(a_entryObject);
             } else {
                _perfSlowCount++;
                this.processMiscType(a_entryObject);
@@ -155,6 +161,9 @@ class InventoryDataSetter extends ItemcardDataExtender
                a_entryObject.subType = _sd.subType >= 0 ? _sd.subType : null;
                a_entryObject.subTypeDisplay = skyui.util.Translator.translate("$Soul Gem");
                this.processSoulGemStatus(a_entryObject);
+               // processSoulGemBaseId handles CC Soul Tomatoes by baseId;
+               // those cannot be classified in C++ (CC plugin filename is unstable).
+               this.processSoulGemBaseId(a_entryObject);
             } else {
                _perfSlowCount++;
                this.processSoulGemType(a_entryObject);

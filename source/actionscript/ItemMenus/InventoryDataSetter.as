@@ -67,8 +67,16 @@ class InventoryDataSetter extends ItemcardDataExtender
             }
             break;
          case skyui.defines.Form.TYPE_BOOK:
-            this.processBookType(a_entryObject);
-            this.processBookBaseId(a_entryObject);
+            a_entryObject.isRead = (a_entryObject.flags & skyui.defines.Item.BOOKFLAG_READ) != 0;
+            if (_sd != undefined) {
+               _perfFastCount++;
+               a_entryObject.subType = _sd.subType >= 0 ? _sd.subType : null;
+               a_entryObject.subTypeDisplay = this.getBookSubTypeDisplay(_sd.subType);
+            } else {
+               _perfSlowCount++;
+               this.processBookType(a_entryObject);
+               this.processBookBaseId(a_entryObject);
+            }
             break;
          case skyui.defines.Form.TYPE_INGREDIENT:
             a_entryObject.subTypeDisplay = skyui.util.Translator.translate("$Ingredient");
@@ -128,8 +136,15 @@ class InventoryDataSetter extends ItemcardDataExtender
          case skyui.defines.Form.TYPE_POTION:
             a_entryObject.duration = a_entryObject.duration <= 0 ? null : Math.round(a_entryObject.duration * 100) / 100;
             a_entryObject.magnitude = a_entryObject.magnitude <= 0 ? null : Math.round(a_entryObject.magnitude * 100) / 100;
-            this.processPotionType(a_entryObject);
-            this.processPotionBaseId(a_entryObject);
+            if (_sd != undefined) {
+               _perfFastCount++;
+               a_entryObject.subType = _sd.subType >= 0 ? _sd.subType : null;
+               a_entryObject.subTypeDisplay = this.getPotionSubTypeDisplay(_sd.subType);
+            } else {
+               _perfSlowCount++;
+               this.processPotionType(a_entryObject);
+               this.processPotionBaseId(a_entryObject);
+            }
             break;
          case skyui.defines.Form.TYPE_SOULGEM:
             if (_sd != undefined) {
@@ -1457,6 +1472,38 @@ class InventoryDataSetter extends ItemcardDataExtender
          case skyui.defines.Material.STORMCLOAK: return skyui.util.Translator.translate("$Stormcloak");
          case skyui.defines.Material.WOOD:       return skyui.util.Translator.translate("$Wood");
          default:                                return skyui.util.Translator.translate("$Other");
+      }
+   }
+   function getBookSubTypeDisplay(a_subType)
+   {
+      switch(a_subType)
+      {
+         case skyui.defines.Item.BOOK_SPELLTOME:   return skyui.util.Translator.translate("$Spell Tome");
+         case skyui.defines.Item.BOOK_NOTE:        return skyui.util.Translator.translate("$Note");
+         case skyui.defines.Item.BOOK_RECIPE:      return skyui.util.Translator.translate("$Recipe");
+         case skyui.defines.Item.BOOK_MAP:         return skyui.util.Translator.translate("$Map");
+         case skyui.defines.Item.BOOK_ELDERSCROLL: return skyui.util.Translator.translate("$ElderScroll");
+         default:                                  return skyui.util.Translator.translate("$Book");
+      }
+   }
+   function getPotionSubTypeDisplay(a_subType)
+   {
+      switch(a_subType)
+      {
+         case skyui.defines.Item.POTION_HEALTH:
+         case skyui.defines.Item.POTION_HEALRATE:
+         case skyui.defines.Item.POTION_HEALRATEMULT:     return skyui.util.Translator.translate("$Health");
+         case skyui.defines.Item.POTION_MAGICKA:
+         case skyui.defines.Item.POTION_MAGICKARATE:
+         case skyui.defines.Item.POTION_MAGICKARATEMULT:  return skyui.util.Translator.translate("$Magicka");
+         case skyui.defines.Item.POTION_STAMINA:
+         case skyui.defines.Item.POTION_STAMINARATE:
+         case skyui.defines.Item.POTION_STAMINARATEMULT:  return skyui.util.Translator.translate("$Stamina");
+         case skyui.defines.Item.POTION_DRINK:            return skyui.util.Translator.translate("$Drink");
+         case skyui.defines.Item.POTION_FOOD:             return skyui.util.Translator.translate("$Food");
+         case skyui.defines.Item.POTION_POISON:           return skyui.util.Translator.translate("$Poison");
+         case skyui.defines.Item.POTION_AYLEIDCRYSTAL:    return skyui.util.Translator.translate("$AyleidCrystal");
+         default:                                         return skyui.util.Translator.translate("$Potion");
       }
    }
    function getMiscSubTypeDisplay(a_subType)

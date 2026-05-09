@@ -256,8 +256,54 @@ namespace SkyUI {
     }
 
     // ---------------------------------------------------------------------------
-    // Books — mirrors processBookType()
+    // Books — mirrors processBookType() + processBookBaseId()
     // ---------------------------------------------------------------------------
+
+    // FormID table for book special cases (maps and Elder Scrolls).
+    // Mirrors processBookBaseId() in AS2.
+    static std::optional<std::int32_t> GetBookSubTypeFromFormID(RE::FormID a_formID) {
+        static const auto s_table = []() {
+            std::unordered_map<RE::FormID, std::int32_t> table;
+            auto* dh = RE::TESDataHandler::GetSingleton();
+            if (!dh) return table;
+
+            auto add = [&](std::string_view plugin, RE::FormID localId, std::int32_t subType) {
+                if (auto* form = dh->LookupForm(localId, plugin))
+                    table.emplace(form->GetFormID(), subType);
+            };
+
+            // --- Skyrim.esm --- treasure maps (12)
+            add("Skyrim.esm", 0x0DDEFB, BookSubType::kMap);
+            add("Skyrim.esm", 0x0EF07A, BookSubType::kMap);
+            add("Skyrim.esm", 0x0F33CD, BookSubType::kMap);
+            add("Skyrim.esm", 0x0F33CE, BookSubType::kMap);
+            add("Skyrim.esm", 0x0F33CF, BookSubType::kMap);
+            add("Skyrim.esm", 0x0F33D0, BookSubType::kMap);
+            add("Skyrim.esm", 0x0F33D1, BookSubType::kMap);
+            add("Skyrim.esm", 0x0F33D2, BookSubType::kMap);
+            add("Skyrim.esm", 0x0F33D3, BookSubType::kMap);
+            add("Skyrim.esm", 0x0F33D4, BookSubType::kMap);
+            add("Skyrim.esm", 0x0F33D5, BookSubType::kMap);
+            add("Skyrim.esm", 0x0F33E0, BookSubType::kMap);
+            // --- Skyrim.esm --- Elder Scrolls (2)
+            add("Skyrim.esm", 0x02D513, BookSubType::kElderScroll);
+            add("Skyrim.esm", 0x048782, BookSubType::kElderScroll);
+            // --- Dawnguard.esm --- Elder Scrolls (3)
+            add("Dawnguard.esm", 0x0126DC, BookSubType::kElderScroll);
+            add("Dawnguard.esm", 0x011A13, BookSubType::kElderScroll);
+            add("Dawnguard.esm", 0x0118F9, BookSubType::kElderScroll);
+            // --- Dragonborn.esm --- map (1)
+            add("Dragonborn.esm", 0x01CAF2, BookSubType::kMap);
+
+            // CC fish maps skipped — CC plugin filenames are not reliably stable.
+
+            return table;
+        }();
+
+        const auto it = s_table.find(a_formID);
+        return (it != s_table.end()) ? std::optional(it->second) : std::nullopt;
+    }
+
     CachedItemData FormCache::BuildBookData(RE::TESObjectBOOK* a_book) {
         CachedItemData d;
 
@@ -266,12 +312,16 @@ namespace SkyUI {
             return d;
         }
 
-        d.subType = BookSubType::kBook;
-
+        // Keyword phase (mirrors processBookType priority order).
         if (a_book->HasKeywordString("VendorItemSpellTome"))
             d.subType = BookSubType::kSpellTome;
         else if (a_book->HasKeywordString("VendorItemRecipe"))
             d.subType = BookSubType::kRecipe;
+        // else: kBook = -1 (generic book, shown without a subType in AS2)
+
+        // FormID phase (mirrors processBookBaseId: maps and Elder Scrolls).
+        if (auto override = GetBookSubTypeFromFormID(a_book->GetFormID()))
+            d.subType = *override;
 
         return d;
     }
@@ -317,12 +367,18 @@ namespace SkyUI {
 
         // Map ActorValue → PotionSubType, mirroring processPotionType() in AS3.
         switch (bestAV) {
-            case RE::ActorValue::kHealth:        d.subType = PotionSubType::kHealth;      break;
-            case RE::ActorValue::kHealRate:      d.subType = PotionSubType::kHealRate;    break;
-            case RE::ActorValue::kMagicka:       d.subType = PotionSubType::kMagicka;     break;
-            case RE::ActorValue::kMagickaRate:   d.subType = PotionSubType::kMagickaRate; break;
-            case RE::ActorValue::kStamina:       d.subType = PotionSubType::kStamina;     break;
-            case RE::ActorValue::kStaminaRate:   d.subType = PotionSubType::kStaminaRate; break;
+            case RE::ActorValue::kHealth:        d.subType = PotionSubType::kHealth;         break;
+            case RE::ActorValue::kHealRate:      d.subType = PotionSubType::kHealRate;       break;
+            case RE::ActorValue::kHealRateMult:  d.subType = PotionSubType::kHealRateMult;   break;
+            case RE::ActorValue::kMagicka:       d.subType = PotionSubType::kMagicka;        break;
+            case RE::ActorValue::kMagickaRate:   d.subType = PotionSubType::kMagickaRate;    break;
+            case RE::ActorValue::kMagickaRateMult: d.subType = PotionSubType::kMagickaRateMult; break;
+            case RE::ActorValue::kStamina:       d.subType = PotionSubType::kStamina;        break;
+            case RE::ActorValue::kStaminaRate:   d.subType = PotionSubType::kStaminaRate;    break;
+            case RE::ActorValue::kStaminaRateMult: d.subType = PotionSubType::kStaminaRateMult; break;
+            case RE::ActorValue::kResistFire:    d.subType = PotionSubType::kFireResist;     break;
+            case RE::ActorValue::kResistShock:   d.subType = PotionSubType::kElectricResist; break;
+            case RE::ActorValue::kResistFrost:   d.subType = PotionSubType::kFrostResist;    break;
             default:                             break;
         }
 
@@ -626,6 +682,7 @@ namespace SkyUI {
     void FormCache::Initialize() {
         // Trigger one-time static initialization of all FormID lookup tables on the
         // main thread (kDataLoaded), before Populate() can be called concurrently.
+        GetBookSubTypeFromFormID(0);
         GetMiscSubTypeFromFormID(0);
         GetSoulGemSubTypeFromFormID(0);
     }

@@ -153,24 +153,33 @@ namespace SkyUI {
 
     // skyui.defines.Item BOOK_* constants
     namespace BookSubType {
-        inline constexpr std::int32_t kSpellTome = 0;
-        inline constexpr std::int32_t kNote      = 1;
-        inline constexpr std::int32_t kRecipe    = 2;
-        inline constexpr std::int32_t kBook      = -1;  // OTHER = undefined → -1 in C++
+        inline constexpr std::int32_t kSpellTome   = 0;
+        inline constexpr std::int32_t kNote        = 1;
+        inline constexpr std::int32_t kRecipe      = 2;
+        inline constexpr std::int32_t kMap         = 3;
+        inline constexpr std::int32_t kElderScroll = 4;
+        inline constexpr std::int32_t kBook        = -1;  // OTHER = undefined → -1 in C++
     }
 
     // skyui.defines.Item POTION_* constants
     namespace PotionSubType {
-        inline constexpr std::int32_t kHealth      = 0;
-        inline constexpr std::int32_t kHealRate    = 1;
-        inline constexpr std::int32_t kMagicka     = 3;
-        inline constexpr std::int32_t kMagickaRate = 4;
-        inline constexpr std::int32_t kStamina     = 6;
-        inline constexpr std::int32_t kStaminaRate = 7;
-        inline constexpr std::int32_t kPotion      = 12;
-        inline constexpr std::int32_t kDrink       = 13;
-        inline constexpr std::int32_t kFood        = 14;
-        inline constexpr std::int32_t kPoison      = 15;
+        inline constexpr std::int32_t kHealth         = 0;
+        inline constexpr std::int32_t kHealRate       = 1;
+        inline constexpr std::int32_t kHealRateMult   = 2;
+        inline constexpr std::int32_t kMagicka        = 3;
+        inline constexpr std::int32_t kMagickaRate    = 4;
+        inline constexpr std::int32_t kMagickaRateMult = 5;
+        inline constexpr std::int32_t kStamina        = 6;
+        inline constexpr std::int32_t kStaminaRate    = 7;
+        inline constexpr std::int32_t kStaminaRateMult = 8;
+        inline constexpr std::int32_t kFireResist     = 9;
+        inline constexpr std::int32_t kElectricResist = 10;
+        inline constexpr std::int32_t kFrostResist    = 11;
+        inline constexpr std::int32_t kPotion         = 12;
+        inline constexpr std::int32_t kDrink          = 13;
+        inline constexpr std::int32_t kFood           = 14;
+        inline constexpr std::int32_t kPoison         = 15;
+        inline constexpr std::int32_t kAyleidCrystal  = 16;
     }
 
     // ---------------------------------------------------------------------------

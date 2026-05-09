@@ -95,6 +95,51 @@ namespace SkyUI {
         inline constexpr std::int32_t kNone       = -1;
     }
 
+    // skyui.defines.Item MISC_* constants
+    namespace MiscSubType {
+        inline constexpr std::int32_t kGem              = 0;
+        inline constexpr std::int32_t kDragonclaw       = 1;
+        inline constexpr std::int32_t kArtifact         = 2;
+        inline constexpr std::int32_t kLeather          = 3;
+        inline constexpr std::int32_t kLeatherStrips    = 4;
+        inline constexpr std::int32_t kHide             = 5;
+        inline constexpr std::int32_t kRemains          = 6;
+        inline constexpr std::int32_t kIngot            = 7;
+        inline constexpr std::int32_t kTool             = 8;
+        inline constexpr std::int32_t kChildrensClothes = 9;
+        inline constexpr std::int32_t kToy              = 10;
+        inline constexpr std::int32_t kFirewood         = 11;
+        inline constexpr std::int32_t kFastener         = 12;
+        inline constexpr std::int32_t kWeaponrack       = 13;
+        inline constexpr std::int32_t kShelf            = 14;
+        inline constexpr std::int32_t kFurniture        = 15;
+        inline constexpr std::int32_t kExterior         = 16;
+        inline constexpr std::int32_t kContainer        = 17;
+        inline constexpr std::int32_t kHousePart        = 18;
+        inline constexpr std::int32_t kClutter          = 19;
+        inline constexpr std::int32_t kLockpick         = 20;
+        inline constexpr std::int32_t kGold             = 21;
+        inline constexpr std::int32_t kTrollskull       = 22;
+        inline constexpr std::int32_t kNetchLeather     = 23;
+        inline constexpr std::int32_t kAyleidCrystal    = 24;
+        inline constexpr std::int32_t kHorseTack        = 25;
+        inline constexpr std::int32_t kBrokenWeapon     = 26;
+        inline constexpr std::int32_t kDwarvenScrap     = 27;
+        inline constexpr std::int32_t kInstrument       = 28;
+        inline constexpr std::int32_t kBugJar           = 29;
+        inline constexpr std::int32_t kScrollSpider     = 30;
+        inline constexpr std::int32_t kOre              = 31;
+        inline constexpr std::int32_t kMap              = 32;
+        inline constexpr std::int32_t kPotion           = 33;
+        inline constexpr std::int32_t kPoison           = 34;
+        inline constexpr std::int32_t kScroll           = 35;
+        inline constexpr std::int32_t kBook             = 36;
+        inline constexpr std::int32_t kRing             = 37;
+        inline constexpr std::int32_t kIngredient       = 38;
+        inline constexpr std::int32_t kPetGear          = 39;
+        inline constexpr std::int32_t kNone             = -1;
+    }
+
     // skyui.defines.Item BOOK_* constants
     namespace BookSubType {
         inline constexpr std::int32_t kSpellTome = 0;
@@ -137,6 +182,10 @@ namespace SkyUI {
     class FormCache {
     public:
         [[nodiscard]] static FormCache* GetSingleton();
+
+        // Warm up static lookup tables on the main thread at kDataLoaded, before
+        // any concurrent Populate() calls can race on the first initialization.
+        static void Initialize();
 
         // Walk a_actor's inventory and insert any unseen forms into the cache.
         void Populate(RE::Actor* a_actor);

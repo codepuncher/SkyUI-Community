@@ -360,11 +360,282 @@ namespace SkyUI {
     }
 
     // ---------------------------------------------------------------------------
-    // Misc — subType classification in AS3 is FormID/keyword-based and very
-    // extensive.  Full classification deferred to a future iteration.
+    // Misc item FormID lookup table — mirrors processMiscBaseId() in AS2.
+    //
+    // Built once on first call using TESDataHandler::LookupForm(localId, plugin),
+    // which resolves FormIDs against the actual load order.  Plugins that are not
+    // installed simply contribute no entries (LookupForm returns nullptr).
+    //
+    // localId is the plugin-local FormID (lower 24 bits only; no plugin-index byte).
     // ---------------------------------------------------------------------------
-    CachedItemData FormCache::BuildMiscData(RE::TESObjectMISC*) {
-        return {};  // TODO: classify misc items (gems, ingots, ore, gold, etc.)
+    static std::optional<std::int32_t> GetMiscSubTypeFromFormID(RE::FormID a_formID) {
+        static const auto s_table = []() {
+            std::unordered_map<RE::FormID, std::int32_t> table;
+            auto* dh = RE::TESDataHandler::GetSingleton();
+            if (!dh) return table;
+
+            auto add = [&](std::string_view plugin, RE::FormID localId, std::int32_t subType) {
+                if (auto* form = dh->LookupForm(localId, plugin))
+                    table.emplace(form->GetFormID(), subType);
+            };
+
+            // --- Skyrim.esm ---
+            // Gems
+            add("Skyrim.esm", 0x06851E, MiscSubType::kGem);  // Flawless Amethyst
+            add("Skyrim.esm", 0x01994F, MiscSubType::kGem);
+            add("Skyrim.esm", 0x059654, MiscSubType::kGem);
+            add("Skyrim.esm", 0x09DFBB, MiscSubType::kGem);
+            add("Skyrim.esm", 0x09F7A6, MiscSubType::kGem);
+            // Dragon claws
+            add("Skyrim.esm", 0x04B56C, MiscSubType::kDragonclaw);  // Ruby
+            add("Skyrim.esm", 0x0AB7BB, MiscSubType::kDragonclaw);  // Ivory
+            add("Skyrim.esm", 0x07C260, MiscSubType::kDragonclaw);  // Glass
+            add("Skyrim.esm", 0x05AF48, MiscSubType::kDragonclaw);  // Ebony
+            add("Skyrim.esm", 0x0ED417, MiscSubType::kDragonclaw);  // Emerald
+            add("Skyrim.esm", 0x0AB375, MiscSubType::kDragonclaw);  // Diamond
+            add("Skyrim.esm", 0x08CDFA, MiscSubType::kDragonclaw);  // Iron
+            add("Skyrim.esm", 0x0B634C, MiscSubType::kDragonclaw);  // Coral
+            add("Skyrim.esm", 0x0999E7, MiscSubType::kDragonclaw);  // Golden (E3)
+            add("Skyrim.esm", 0x0663D7, MiscSubType::kDragonclaw);  // Sapphire
+            add("Skyrim.esm", 0x039647, MiscSubType::kDragonclaw);  // Golden (MS13)
+            // Remains
+            add("Skyrim.esm", 0x075868, MiscSubType::kRemains);
+            add("Skyrim.esm", 0x0F6767, MiscSubType::kRemains);
+            add("Skyrim.esm", 0x0AADB6, MiscSubType::kRemains);
+            add("Skyrim.esm", 0x0AADB7, MiscSubType::kRemains);
+            add("Skyrim.esm", 0x04286C, MiscSubType::kRemains);
+            // Special items
+            add("Skyrim.esm", 0x00000A, MiscSubType::kLockpick    );
+            add("Skyrim.esm", 0x00000F, MiscSubType::kGold        );
+            add("Skyrim.esm", 0x0DB5D2, MiscSubType::kLeather     );
+            add("Skyrim.esm", 0x0800E4, MiscSubType::kLeatherStrips);
+            add("Skyrim.esm", 0x03AD57, MiscSubType::kNetchLeather);
+            // Broken weapons (31)
+            add("Skyrim.esm", 0x0E72AA, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x0E72AC, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x0E72B0, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x0E72AE, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x0E72A6, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x0E72A8, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x0E72A0, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x0E729E, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x0E729A, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x0E729C, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x0E7296, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x0E7298, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x0E72A4, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x0E72A2, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x064283, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x064285, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x064287, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x064289, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x06428B, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x06428E, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x064290, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x064292, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x064294, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x064296, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x064298, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x06E806, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x0DB351, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x0240D3, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x0240D4, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x0240D5, MiscSubType::kBrokenWeapon);
+            add("Skyrim.esm", 0x0240D6, MiscSubType::kBrokenWeapon);
+            // Dwarven scrap (12)
+            add("Skyrim.esm", 0x0C886C, MiscSubType::kDwarvenScrap);
+            add("Skyrim.esm", 0x0C8878, MiscSubType::kDwarvenScrap);
+            add("Skyrim.esm", 0x0C8864, MiscSubType::kDwarvenScrap);
+            add("Skyrim.esm", 0x0C8872, MiscSubType::kDwarvenScrap);
+            add("Skyrim.esm", 0x0C8866, MiscSubType::kDwarvenScrap);
+            add("Skyrim.esm", 0x0C8874, MiscSubType::kDwarvenScrap);
+            add("Skyrim.esm", 0x0C886A, MiscSubType::kDwarvenScrap);
+            add("Skyrim.esm", 0x0AEBF1, MiscSubType::kDwarvenScrap);
+            add("Skyrim.esm", 0x0C8861, MiscSubType::kDwarvenScrap);
+            add("Skyrim.esm", 0x0C8868, MiscSubType::kDwarvenScrap);
+            add("Skyrim.esm", 0x0C886E, MiscSubType::kDwarvenScrap);
+            add("Skyrim.esm", 0x0C8870, MiscSubType::kDwarvenScrap);
+            // Instruments (9)
+            add("Skyrim.esm", 0x0DABA9, MiscSubType::kInstrument);
+            add("Skyrim.esm", 0x0DABA7, MiscSubType::kInstrument);
+            add("Skyrim.esm", 0x105177, MiscSubType::kInstrument);
+            add("Skyrim.esm", 0x03292F, MiscSubType::kInstrument);
+            add("Skyrim.esm", 0x0200BA, MiscSubType::kInstrument);
+            add("Skyrim.esm", 0x0DABAB, MiscSubType::kInstrument);
+            add("Skyrim.esm", 0x0200B6, MiscSubType::kInstrument);
+            add("Skyrim.esm", 0x105109, MiscSubType::kInstrument);
+            add("Skyrim.esm", 0x0E77BB, MiscSubType::kInstrument);
+            // Bug jars (5)
+            add("Skyrim.esm", 0x0B08C7, MiscSubType::kBugJar);
+            add("Skyrim.esm", 0x0FBC3A, MiscSubType::kBugJar);
+            add("Skyrim.esm", 0x0FBC3B, MiscSubType::kBugJar);
+            add("Skyrim.esm", 0x0FBC3C, MiscSubType::kBugJar);
+            add("Skyrim.esm", 0x0FBC3D, MiscSubType::kBugJar);
+            // Maps
+            add("Skyrim.esm", 0x060CC2, MiscSubType::kMap);
+            add("Skyrim.esm", 0x0BBCD5, MiscSubType::kMap);
+            // Daedric artifacts
+            add("Skyrim.esm", 0x028AD7, MiscSubType::kArtifact);  // Azura's Star
+            add("Skyrim.esm", 0x02C259, MiscSubType::kArtifact);
+            add("Skyrim.esm", 0x02C25A, MiscSubType::kArtifact);
+            // Misc re-classified items
+            add("Skyrim.esm", 0x0C4F2E, MiscSubType::kPotion);
+            add("Skyrim.esm", 0x02BAAB, MiscSubType::kPoison);
+            add("Skyrim.esm", 0x0457AB, MiscSubType::kScroll);
+            add("Skyrim.esm", 0x0DC530, MiscSubType::kScroll);
+            add("Skyrim.esm", 0x0DC52E, MiscSubType::kScroll);
+            add("Skyrim.esm", 0x0F1491, MiscSubType::kBook  );
+            add("Skyrim.esm", 0x0CE70B, MiscSubType::kBook  );
+            add("Skyrim.esm", 0x0E4897, MiscSubType::kBook  );
+            add("Skyrim.esm", 0x0E3CB7, MiscSubType::kBook  );
+            add("Skyrim.esm", 0x01CB34, MiscSubType::kRing  );
+            add("Skyrim.esm", 0x0DA732, MiscSubType::kRing  );
+            add("Skyrim.esm", 0x0DA733, MiscSubType::kRing  );
+            add("Skyrim.esm", 0x0DA734, MiscSubType::kRing  );
+            add("Skyrim.esm", 0x0DA735, MiscSubType::kRing  );
+            // Ores (10)
+            add("Skyrim.esm", 0x05ACDB, MiscSubType::kOre);
+            add("Skyrim.esm", 0x05ACDC, MiscSubType::kOre);
+            add("Skyrim.esm", 0x05ACDE, MiscSubType::kOre);
+            add("Skyrim.esm", 0x071CF3, MiscSubType::kOre);
+            add("Skyrim.esm", 0x05ACE1, MiscSubType::kOre);
+            add("Skyrim.esm", 0x05ACE0, MiscSubType::kOre);
+            add("Skyrim.esm", 0x05ACDD, MiscSubType::kOre);
+            add("Skyrim.esm", 0x05ACE2, MiscSubType::kOre);
+            add("Skyrim.esm", 0x05B2DF, MiscSubType::kOre);
+            add("Skyrim.esm", 0x05ACDF, MiscSubType::kOre);
+
+            // --- Update.esm ---
+            add("Update.esm", 0x0030C9, MiscSubType::kHorseTack);
+            add("Update.esm", 0x0030CA, MiscSubType::kHorseTack);
+
+            // --- Dawnguard.esm ---
+            // Gems
+            add("Dawnguard.esm", 0x012F97, MiscSubType::kGem);
+            add("Dawnguard.esm", 0x012FC3, MiscSubType::kGem);
+            add("Dawnguard.esm", 0x019ABB, MiscSubType::kGem);
+            add("Dawnguard.esm", 0x019ABC, MiscSubType::kGem);
+            add("Dawnguard.esm", 0x019ABD, MiscSubType::kGem);
+            // Remains
+            add("Dawnguard.esm", 0x002993, MiscSubType::kRemains);
+            add("Dawnguard.esm", 0x002994, MiscSubType::kRemains);
+            add("Dawnguard.esm", 0x011CF7, MiscSubType::kRemains);
+            add("Dawnguard.esm", 0x005704, MiscSubType::kRemains);
+            add("Dawnguard.esm", 0x005705, MiscSubType::kRemains);
+            add("Dawnguard.esm", 0x005706, MiscSubType::kRemains);
+            add("Dawnguard.esm", 0x005707, MiscSubType::kRemains);
+            // Netch leather (chitin)
+            add("Dawnguard.esm", 0x0195AA, MiscSubType::kNetchLeather);
+
+            // --- HearthFires.esm --- house parts (10)
+            add("HearthFires.esm", 0x003043, MiscSubType::kHousePart);
+            add("HearthFires.esm", 0x003035, MiscSubType::kHousePart);
+            add("HearthFires.esm", 0x005A69, MiscSubType::kHousePart);
+            add("HearthFires.esm", 0x003011, MiscSubType::kHousePart);
+            add("HearthFires.esm", 0x00303F, MiscSubType::kHousePart);
+            add("HearthFires.esm", 0x003012, MiscSubType::kHousePart);
+            add("HearthFires.esm", 0x00300E, MiscSubType::kHousePart);
+            add("HearthFires.esm", 0x00300F, MiscSubType::kHousePart);
+            add("HearthFires.esm", 0x00306C, MiscSubType::kHousePart);
+            add("HearthFires.esm", 0x005A68, MiscSubType::kHousePart);
+
+            // --- Dragonborn.esm ---
+            // Dragon claws
+            add("Dragonborn.esm", 0x01CAC0, MiscSubType::kDragonclaw);
+            add("Dragonborn.esm", 0x01CAC1, MiscSubType::kDragonclaw);
+            // Gems
+            add("Dragonborn.esm", 0x02145A, MiscSubType::kGem);
+            add("Dragonborn.esm", 0x03166F, MiscSubType::kGem);
+            add("Dragonborn.esm", 0x031670, MiscSubType::kGem);
+            add("Dragonborn.esm", 0x031671, MiscSubType::kGem);
+            add("Dragonborn.esm", 0x031672, MiscSubType::kGem);
+            // Netch leather (chitin + netch)
+            add("Dragonborn.esm", 0x02B04E, MiscSubType::kNetchLeather);
+            add("Dragonborn.esm", 0x01CD7C, MiscSubType::kNetchLeather);
+            // Other
+            add("Dragonborn.esm", 0x0247F9, MiscSubType::kTrollskull );
+            add("Dragonborn.esm", 0x017719, MiscSubType::kScrollSpider);
+            add("Dragonborn.esm", 0x01771F, MiscSubType::kScrollSpider);
+            add("Dragonborn.esm", 0x02BAAE, MiscSubType::kMap        );
+            add("Dragonborn.esm", 0x01AAD6, MiscSubType::kIngredient );
+            // Ores (3)
+            add("Dragonborn.esm", 0x02B06B, MiscSubType::kOre);
+            add("Dragonborn.esm", 0x017749, MiscSubType::kOre);
+            add("Dragonborn.esm", 0x0195A9, MiscSubType::kOre);
+
+            // --- CC plugins ---
+            // CC items that have proper vendor keywords are classified correctly
+            // by the keyword phase above; specific CC items without keywords are
+            // not covered here since CC plugin filenames and local IDs vary
+            // between game versions and are not reliably stable.
+
+            return table;
+        }();
+
+        const auto it = s_table.find(a_formID);
+        return (it != s_table.end()) ? std::optional(it->second) : std::nullopt;
+    }
+
+    void FormCache::Initialize() {
+        // Trigger the one-time static initialization of the misc FormID lookup
+        // table on the main thread (kDataLoaded), before Populate() can be
+        // called concurrently from inventory opens.
+        GetMiscSubTypeFromFormID(0);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Misc — two-phase classification mirroring InventoryDataSetter.as:
+    //   Phase 1 (processMiscType)   — keyword-based, covers most items.
+    //   Phase 2 (processMiscBaseId) — FormID overrides, refines edge cases
+    //                                 (e.g. distinguishes ore from ingot, adds
+    //                                 gold/lockpick/claws that lack keywords).
+    // ---------------------------------------------------------------------------
+    CachedItemData FormCache::BuildMiscData(RE::TESObjectMISC* a_misc) {
+        CachedItemData d;
+
+        // Phase 1: keyword-based classification.
+        // Priority order mirrors processMiscType() in AS2 exactly.
+        auto has = [&](std::initializer_list<std::string_view> kwList) {
+            for (auto kw : kwList)
+                if (a_misc->HasKeywordString(kw)) return true;
+            return false;
+        };
+
+        if (has({"BYOHAdoptionClothesKeyword"}))
+            d.subType = MiscSubType::kChildrensClothes;
+        else if (has({"BYOHAdoptionToyKeyword"}))
+            d.subType = MiscSubType::kToy;
+        else if (has({"BYOHHouseCraftingCategoryWeaponRacks",
+                      "BYOHHouseCraftingCategoryShelf",
+                      "BYOHHouseCraftingCategoryFurniture",
+                      "BYOHHouseCraftingCategoryExterior",
+                      "BYOHHouseCraftingCategoryContainers",
+                      "BYOHHouseCraftingCategoryBuilding",
+                      "BYOHHouseCraftingCategorySmithing"}))
+            d.subType = MiscSubType::kHousePart;
+        else if (has({"VendorItemDaedricArtifact"}))
+            d.subType = MiscSubType::kArtifact;
+        else if (has({"VendorItemGem"}))
+            d.subType = MiscSubType::kGem;
+        else if (has({"VendorItemAnimalHide"}))
+            d.subType = MiscSubType::kHide;
+        else if (has({"VendorItemTool"}))
+            d.subType = MiscSubType::kTool;
+        else if (has({"VendorItemAnimalPart"}))
+            d.subType = MiscSubType::kRemains;
+        else if (has({"VendorItemOreIngot"}))
+            d.subType = MiscSubType::kIngot;
+        else if (has({"VendorItemFireword"}))  // note: original AS2 has this typo
+            d.subType = MiscSubType::kFirewood;
+        else if (has({"VendorItemClutter"}))
+            d.subType = MiscSubType::kClutter;
+
+        // Phase 2: FormID-based overrides.
+        // Applied on top of phase 1 result, mirroring processMiscBaseId() in AS2.
+        if (auto override = GetMiscSubTypeFromFormID(a_misc->GetFormID()))
+            d.subType = *override;
+
+        return d;
     }
 
     // ---------------------------------------------------------------------------

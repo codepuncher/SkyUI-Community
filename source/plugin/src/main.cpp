@@ -8,6 +8,7 @@ namespace {
         switch (a_msg->type) {
             case SKSE::MessagingInterface::kDataLoaded:
                 logger::info("SkyUI plugin: data loaded");
+                SkyUI::FormCache::GetSingleton()->Initialize();
                 SkyUI::RegisterEventSinks();
                 break;
             case SKSE::MessagingInterface::kNewGame:

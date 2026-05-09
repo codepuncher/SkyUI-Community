@@ -126,42 +126,19 @@ file(GLOB PAPYRUS_SOURCES
 )
 
 if(PAPYRUS_SOURCES)
-    set(_papyrus_imports "${CMAKE_CURRENT_SOURCE_DIR}/source/scripts")
-    foreach(_dir
-        "${SkyrimSE_PATH}/Data/Scripts/Source"
-        "${SkyrimSE_PATH}/Data/Source/Scripts"
+    Papyrus_Add(
+        "Papyrus"
+        GAME "${SkyrimSE_PATH}"
+        MODE SkyrimSE
+        IMPORTS
+            "${CMAKE_CURRENT_SOURCE_DIR}/source/scripts"
+            "${SkyrimSE_PATH}/Data/Scripts/Source"
+            "${SkyrimSE_PATH}/Data/Source/Scripts"
+        SOURCES ${PAPYRUS_SOURCES}
+        # OPTIMIZE
+        ANONYMIZE
+        SKIP_DEFAULT_IMPORTS
     )
-        if(EXISTS "${_dir}")
-            list(APPEND _papyrus_imports "${_dir}")
-        endif()
-    endforeach()
-
-    if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
-        # Use the official PapyrusCompiler.exe via Wine (CK must be installed).
-        # Caprica 0.3.0 rejects valid user-defined events that the official
-        # compiler accepts, so we prefer PapyrusCompiler.exe on Linux too.
-        Papyrus_Add(
-            "Papyrus"
-            GAME "${SkyrimSE_PATH}"
-            MODE SkyrimSE
-            IMPORTS ${_papyrus_imports}
-            SOURCES ${PAPYRUS_SOURCES}
-            # OPTIMIZE
-            ANONYMIZE
-            SKIP_DEFAULT_IMPORTS
-        )
-    else()
-        Papyrus_Add(
-            "Papyrus"
-            GAME "${SkyrimSE_PATH}"
-            MODE SkyrimSE
-            IMPORTS ${_papyrus_imports}
-            SOURCES ${PAPYRUS_SOURCES}
-            # OPTIMIZE
-            ANONYMIZE
-            SKIP_DEFAULT_IMPORTS
-        )
-    endif()
 else()
     message(STATUS "[Build] No Papyrus sources found -- skipping.")
     add_custom_target("Papyrus")
@@ -225,21 +202,6 @@ if(IS_DEBUG_BUILD)
         VERBATIM
     )
     add_dependencies("deploy_debug" "Papyrus" "ActionScript")
-
-    # package_debug: zip the dist/ output into a Vortex-installable archive.
-    # Fixed name so Vortex recognises each rebuild as an update to the same mod.
-    set(_DEV_ZIP_OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/SkyUI_SE_dev.zip")
-    set(_PACKAGE_DEBUG_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/cmake/PackageDebug.cmake")
-
-    add_custom_target("package_debug"
-        COMMAND "${CMAKE_COMMAND}"
-            "-DDIST_DIR=${MOD_DEBUG_PATH}"
-            "-DZIP_OUTPUT=${_DEV_ZIP_OUTPUT}"
-            -P "${_PACKAGE_DEBUG_SCRIPT}"
-        DEPENDS "deploy_debug"
-        COMMENT "Packaging dev build -> ${_DEV_ZIP_OUTPUT}"
-        VERBATIM
-    )
 
 # ---------------------------------------------------------------------------
 # Release Mode -- BSA + ZIP

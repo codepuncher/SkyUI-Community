@@ -140,6 +140,9 @@ class InventoryDataSetter extends ItemcardDataExtender
                _perfFastCount++;
                a_entryObject.subType = _sd.subType >= 0 ? _sd.subType : null;
                a_entryObject.subTypeDisplay = this.getPotionSubTypeDisplay(_sd.subType);
+               // processPotionBaseId handles CC Ayleid Crystal potions by baseId;
+               // those cannot be classified in C++ (CC plugin filename is unstable).
+               this.processPotionBaseId(a_entryObject);
             } else {
                _perfSlowCount++;
                this.processPotionType(a_entryObject);

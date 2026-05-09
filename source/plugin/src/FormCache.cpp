@@ -312,11 +312,11 @@ namespace SkyUI {
             return d;
         }
 
-        // Keyword phase (mirrors processBookType priority order).
-        if (a_book->HasKeywordString("VendorItemSpellTome"))
-            d.subType = BookSubType::kSpellTome;
-        else if (a_book->HasKeywordString("VendorItemRecipe"))
+        // Keyword phase (mirrors processBookType priority order: Recipe before SpellTome).
+        if (a_book->HasKeywordString("VendorItemRecipe"))
             d.subType = BookSubType::kRecipe;
+        else if (a_book->HasKeywordString("VendorItemSpellTome"))
+            d.subType = BookSubType::kSpellTome;
         // else: kBook = -1 (generic book, shown without a subType in AS2)
 
         // FormID phase (mirrors processBookBaseId: maps and Elder Scrolls).
@@ -327,7 +327,7 @@ namespace SkyUI {
     }
 
     // ---------------------------------------------------------------------------
-    // Potions / Alchemy — mirrors processPotionType()
+    // Potions / Alchemy — mirrors processPotionType() + processPotionBaseId()
     // ---------------------------------------------------------------------------
     CachedItemData FormCache::BuildAlchemyData(RE::AlchemyItem* a_alchemy) {
         CachedItemData d;
@@ -365,7 +365,7 @@ namespace SkyUI {
             }
         }
 
-        // Map ActorValue → PotionSubType, mirroring processPotionType() in AS3.
+        // Map ActorValue → PotionSubType, mirroring processPotionType() in AS2.
         switch (bestAV) {
             case RE::ActorValue::kHealth:        d.subType = PotionSubType::kHealth;         break;
             case RE::ActorValue::kHealRate:      d.subType = PotionSubType::kHealRate;       break;
@@ -381,6 +381,11 @@ namespace SkyUI {
             case RE::ActorValue::kResistFrost:   d.subType = PotionSubType::kFrostResist;    break;
             default:                             break;
         }
+
+        // NOTE: Ayleid Crystal potions (BASEID_CC067AYLEIDCRYSTALPOTION in AS2) cannot be
+        // classified here because the CC plugin filename is not reliably stable across game
+        // versions.  The AS2 fast path calls processPotionBaseId() unconditionally to cover
+        // these items via the baseId check instead.
 
         return d;
     }

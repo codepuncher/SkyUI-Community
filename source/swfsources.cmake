@@ -1,5 +1,6 @@
 macro(Add_SWF _TARGET_NAME _SWF_REL _XML_PATH)
     set(_SKIP_IN_RELEASE FALSE)
+    set(_SKIP_DEPLOY FALSE)
     set(_RAW_SOURCES ${ARGN})
     set(_SOURCES "")
     
@@ -11,6 +12,9 @@ macro(Add_SWF _TARGET_NAME _SWF_REL _XML_PATH)
     foreach(_token IN LISTS _RAW_SOURCES)
         if("${_token}" STREQUAL "SKIP_IN_RELEASE")
             set(_SKIP_IN_RELEASE TRUE)
+            set(_LAST_TOKEN "") # Keywords cannot be directory names
+        elseif("${_token}" STREQUAL "SKIP_DEPLOY")
+            set(_SKIP_DEPLOY TRUE)
             set(_LAST_TOKEN "") # Keywords cannot be directory names
         elseif("${_token}" STREQUAL "{")
             # Validation: Check if the preceding token is a valid folder name
@@ -83,7 +87,9 @@ macro(Add_SWF _TARGET_NAME _SWF_REL _XML_PATH)
         )
 
         list(APPEND AS_TARGETS           AS_${_TARGET_NAME})
-        list(APPEND SWF_COMPILED_OUTPUTS ${AS_${_TARGET_NAME}_OUTPUT})
+        if(NOT _SKIP_DEPLOY)
+            list(APPEND SWF_COMPILED_OUTPUTS ${AS_${_TARGET_NAME}_OUTPUT})
+        endif()
     else()
         message(STATUS "[Build] Skipping ${_TARGET_NAME} (release build)")
     endif()
@@ -843,9 +849,10 @@ Add_SWF(tweenmenu
     }
 )
 
-# Only for design debug mode
+# Only for design: compiles to build dir for JPEXS font visibility, never deployed to game.
 Add_SWF(gfxfontlib
     gfxfontlib.swf
     gfxfontlib.xml
     SKIP_IN_RELEASE
+    SKIP_DEPLOY
 )

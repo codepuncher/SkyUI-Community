@@ -61,10 +61,7 @@ if(IS_DEBUG_BUILD)
 endif()
 
 # SKSE_PLUGIN_DLL: path to the pre-built SkyUI_SE.dll.
-# The plugin is built separately (source/plugin/) with its own CMake presets.
-# Set this to the DLL output path for your build type:
-#   Debug:   source/plugin/build/debug-clang-cl-vcpkg-ae/SkyUI_SE.dll
-#   Release: source/plugin/build/release-clang-cl-vcpkg-ae/SkyUI_SE.dll
+# Built automatically via ExternalProject_Add below using the plugin's own CMake presets.
 if(NOT DEFINED SKSE_PLUGIN_DLL OR SKSE_PLUGIN_DLL STREQUAL "")
     if(IS_DEBUG_BUILD)
         set(_DEFAULT_DLL "${CMAKE_CURRENT_SOURCE_DIR}/source/plugin/build/debug-clang-cl-vcpkg-ae/SkyUI_SE.dll")
@@ -74,11 +71,41 @@ if(NOT DEFINED SKSE_PLUGIN_DLL OR SKSE_PLUGIN_DLL STREQUAL "")
     set(SKSE_PLUGIN_DLL "${_DEFAULT_DLL}" CACHE FILEPATH "Path to pre-built SkyUI_SE.dll")
 endif()
 
-if(EXISTS "${SKSE_PLUGIN_DLL}")
-    message(STATUS "[Build] SKSE plugin  : ${SKSE_PLUGIN_DLL}")
+# ---------------------------------------------------------------------------
+# SKSE Plugin (integrated build)
+# ---------------------------------------------------------------------------
+
+if(IS_DEBUG_BUILD)
+    set(_PLUGIN_PRESET "debug-clang-cl-vcpkg-ae")
 else()
-    message(WARNING "[Build] SKSE plugin not found at ${SKSE_PLUGIN_DLL} -- DLL will be excluded from output. Build source/plugin/ first.")
+    set(_PLUGIN_PRESET "release-clang-cl-vcpkg-ae")
 endif()
+
+set(_PLUGIN_BUILD_DIR "${CMAKE_CURRENT_SOURCE_DIR}/source/plugin/build/${_PLUGIN_PRESET}")
+
+# If the plugin build directory doesn't exist yet, run the full configure first.
+if(NOT EXISTS "${_PLUGIN_BUILD_DIR}/build.ninja" AND NOT EXISTS "${_PLUGIN_BUILD_DIR}/Makefile")
+    message(STATUS "[Build] SKSE plugin build dir not found — configuring plugin...")
+    execute_process(
+        COMMAND "${CMAKE_COMMAND}" "--preset" "${_PLUGIN_PRESET}"
+                "-S" "${CMAKE_CURRENT_SOURCE_DIR}/source/plugin"
+        RESULT_VARIABLE _PLUGIN_CONFIGURE_RESULT
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/source/plugin"
+    )
+    if(NOT _PLUGIN_CONFIGURE_RESULT EQUAL 0)
+        message(WARNING "[Build] SKSE plugin configure failed — DLL may be missing.")
+    endif()
+endif()
+
+# Incremental build: just run cmake --build on the existing build dir each time.
+add_custom_target(SKSEPlugin ALL
+    COMMAND "${CMAKE_COMMAND}" --build "${_PLUGIN_BUILD_DIR}"
+    BYPRODUCTS "${SKSE_PLUGIN_DLL}"
+    COMMENT "[Build] Building SKSE plugin..."
+    VERBATIM
+)
+
+message(STATUS "[Build] SKSE plugin  : ${SKSE_PLUGIN_DLL}")
 
 message(STATUS "[Build] Build type : ${CMAKE_BUILD_TYPE}")
 
@@ -223,7 +250,7 @@ if(IS_DEBUG_BUILD)
         COMMENT "Deploying to ${MOD_DEBUG_PATH}"
         VERBATIM
     )
-    add_dependencies("deploy_debug" "Papyrus" "ActionScript")
+    add_dependencies("deploy_debug" "Papyrus" "ActionScript" "SKSEPlugin")
 
 # ---------------------------------------------------------------------------
 # Release Mode -- BSA + ZIP
@@ -279,6 +306,6 @@ else()
     add_custom_target("release" ALL
         DEPENDS "${_ZIP_OUTPUT}"
     )
-    add_dependencies("release" "BSA")
+    add_dependencies("release" "BSA" "SKSEPlugin")
 
 endif()

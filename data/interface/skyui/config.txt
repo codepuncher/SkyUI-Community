@@ -31,6 +31,19 @@ itemcard.yOffset = 0
 ; =====================================================================================================================
 quantityMenu.minCount = 6 ; Number of items required to trigger quantity dialog. 0 is disabled
 
+; Timestamp sort settings (controlled via MCM — these are the defaults)
+; excludedTypes: comma-separated list of formType names to exclude from timestamp sorting.
+;   Excluded items get acquiredTimestamp = 0 and sort to the bottom.
+;   Valid names: Gold, Ammo (case-insensitive)
+timestampSort.excludedTypes = Gold,Ammo
+; displayFormat: index of the display format for the Acquired column.
+;   0 = Relative short (2h ago)   1 = Relative long (2 hours ago)
+;   2 = Date short (10/05/26)     3 = Date medium (10/05/2026)
+;   4 = Date long (10 May 2026)   5 = Date + time (10/05/2026 13:48)
+;   6 = Time only (13:48 / date)  7 = Day of week (Saturday)
+;   8 = Session-relative (This session / Yesterday / N days ago)
+timestampSort.displayFormat = 0
+
 
 ; =====================================================================================================================
 [Appearance] 
@@ -405,6 +418,26 @@ columns.spellCostColumn.state2.label.arrowDown = false
 columns.spellCostColumn.state2.entry.text = @spellCostDisplay
 columns.spellCostColumn.state2.sortAttributes = <infoSpellCost, text>
 columns.spellCostColumn.state2.sortOptions = <{ASCENDING | NUMERIC}, {ASCENDING | CASEINSENSITIVE}>
+
+
+; ACQUIRED COLUMN -------------------------------------------------------
+columns.acquiredColumn.type = TEXT
+columns.acquiredColumn.name = '$ACQUIRED'
+columns.acquiredColumn.states = 2
+columns.acquiredColumn.width = 0.12
+columns.acquiredColumn.border = a_textBorder
+
+columns.acquiredColumn.state1.label.text = '$ACQ'
+columns.acquiredColumn.state1.label.arrowDown = true
+columns.acquiredColumn.state1.entry.text = @acquiredTimestampDisplay
+columns.acquiredColumn.state1.sortAttributes = <acquiredTimestamp, text>
+columns.acquiredColumn.state1.sortOptions = <{DESCENDING | NUMERIC}, {ASCENDING | CASEINSENSITIVE}>
+
+columns.acquiredColumn.state2.label.text = '$ACQ'
+columns.acquiredColumn.state2.label.arrowDown = false
+columns.acquiredColumn.state2.entry.text = @acquiredTimestampDisplay
+columns.acquiredColumn.state2.sortAttributes = <acquiredTimestamp, text>
+columns.acquiredColumn.state2.sortOptions = <{ASCENDING | NUMERIC}, {ASCENDING | CASEINSENSITIVE}>
 
 
 ; WORD 1 COLUMN -------------------------------------------

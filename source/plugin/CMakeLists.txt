@@ -59,6 +59,7 @@ add_commonlibsse_plugin(${PROJECT_NAME}
         src/EventSink.cpp
         src/FormCache.cpp
         src/ScaleformAPI.cpp
+        src/TimestampCache.cpp
     USE_ADDRESS_LIBRARY
 )
 

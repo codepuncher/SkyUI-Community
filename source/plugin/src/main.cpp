@@ -3,6 +3,7 @@
 #include "FormCache.h"
 #include "Plugin.h"
 #include "ScaleformAPI.h"
+#include "TimestampCache.h"
 
 namespace {
     void MessageHandler(SKSE::MessagingInterface::Message* a_msg) {
@@ -14,12 +15,32 @@ namespace {
                 break;
             case SKSE::MessagingInterface::kNewGame:
             case SKSE::MessagingInterface::kPostLoadGame:
-                // Clear cache on new game or load so stale FormIDs from a previous
-                // session don't persist.  The cache is repopulated on next
-                // inventory open.
+                // Clear caches on new game or load so stale data from a previous
+                // session doesn't persist.  Caches are repopulated on next
+                // inventory open / item acquisition event.
                 SkyUI::FormCache::GetSingleton()->Clear();
+                SkyUI::TimestampCache::GetSingleton()->Clear();
                 break;
         }
+    }
+
+    void SaveCallback(SKSE::SerializationInterface* a_intfc) {
+        SkyUI::TimestampCache::GetSingleton()->Save(a_intfc);
+    }
+
+    void LoadCallback(SKSE::SerializationInterface* a_intfc) {
+        std::uint32_t type, version, length;
+        while (a_intfc->GetNextRecordInfo(type, version, length)) {
+            if (type == SkyUI::TimestampCache::kSerializationKey) {
+                SkyUI::TimestampCache::GetSingleton()->Load(a_intfc);
+            } else {
+                logger::warn("TimestampCache: unknown record type {:08X} — skipping", type);
+            }
+        }
+    }
+
+    void RevertCallback(SKSE::SerializationInterface*) {
+        SkyUI::TimestampCache::GetSingleton()->Clear();
     }
 }
 
@@ -37,6 +58,12 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse) {
 
     auto* messaging = SKSE::GetMessagingInterface();
     messaging->RegisterListener(MessageHandler);
+
+    auto* serialization = SKSE::GetSerializationInterface();
+    serialization->SetUniqueID(SkyUI::TimestampCache::kSerializationKey);
+    serialization->SetSaveCallback(SaveCallback);
+    serialization->SetLoadCallback(LoadCallback);
+    serialization->SetRevertCallback(RevertCallback);
 
     auto* scaleform = SKSE::GetScaleformInterface();
     scaleform->Register(SkyUI::ScaleformRegisterCallback, SkyUI::Plugin::kName);

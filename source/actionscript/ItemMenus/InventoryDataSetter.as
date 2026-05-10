@@ -43,6 +43,11 @@ class InventoryDataSetter extends ItemcardDataExtender
       var _sd = (_getStaticData != undefined)
                    ? _getStaticData(a_entryObject.formId)
                    : undefined;
+      // Acquisition timestamp (Unix seconds). 0 = unknown (item predates feature
+      // or type is excluded). Used by the Acquired sort column.
+      a_entryObject.acquiredTimestamp = (_sd != undefined && _sd.acquiredTimestamp > 0)
+                                        ? _sd.acquiredTimestamp
+                                        : 0;
       switch(a_entryObject.formType)
       {
          case skyui.defines.Form.TYPE_SCROLLITEM:

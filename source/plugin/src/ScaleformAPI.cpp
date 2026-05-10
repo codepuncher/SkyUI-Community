@@ -1,6 +1,7 @@
 #include "ScaleformAPI.h"
 #include "FormCache.h"
 #include "Plugin.h"
+#include "TimestampCache.h"
 
 namespace SkyUI {
 
@@ -54,6 +55,11 @@ namespace SkyUI {
                 val.SetString(data->subTypeDisplayKey);
                 a_params.retVal->SetMember("subTypeDisplay", val);
             }
+
+            // Acquired timestamp — 0 if never recorded (item predates the feature).
+            const auto ts = TimestampCache::GetSingleton()->Get(formID);
+            val.SetNumber(static_cast<double>(ts));
+            a_params.retVal->SetMember("acquiredTimestamp", val);
         }
     };
 

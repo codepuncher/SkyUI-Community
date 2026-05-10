@@ -96,6 +96,28 @@ include(BSArchive)
 include(ImportToSWF)
 include(SWFXMLPatch)
 
+# On Linux, bsarch.exe must run under Wine. Generate a wrapper script at
+# configure time and pre-set BSARCH_COMMAND so BSArchive_FindBSArch skips
+# its own find/download logic.
+if(UNIX AND NOT APPLE)
+    set(_BSARCH_EXE "${CMAKE_BINARY_DIR}/tools/bsarch.exe")
+    if(NOT EXISTS "${_BSARCH_EXE}")
+        message(STATUS "[Build] Downloading bsarch.exe...")
+        file(DOWNLOAD
+            "https://github.com/TES5Edit/TES5Edit/raw/b3235062f275a7d4a94162af910923ba79f0e77a/Tools/BSArchive/bsarch.exe"
+            "${_BSARCH_EXE}"
+            EXPECTED_HASH SHA3_224=87e25b2c8b6c90c00d3a2141ec2130a97daa184aff5f2d3d6595c872
+        )
+    endif()
+    set(_BSARCH_WRAPPER "${CMAKE_BINARY_DIR}/tools/bsarch")
+    file(WRITE "${_BSARCH_WRAPPER}" "#!/bin/sh\nexec wine \"${_BSARCH_EXE}\" \"$@\"\n")
+    file(CHMOD "${_BSARCH_WRAPPER}"
+        PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
+                    GROUP_READ GROUP_EXECUTE
+                    WORLD_READ WORLD_EXECUTE)
+    set(BSARCH_COMMAND "${_BSARCH_WRAPPER}")
+endif()
+
 # ---------------------------------------------------------------------------
 # FFDec CLI Detection
 # ---------------------------------------------------------------------------

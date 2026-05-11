@@ -28,9 +28,15 @@ namespace SkyUI {
                 static_cast<std::uint32_t>(a_params.args[0].GetNumber()));
 
             const auto* data = FormCache::GetSingleton()->Get(formID);
-            if (!data) {
-                // Cache miss — return undefined.  This is expected for items the
-                // player has never opened an inventory menu with.
+
+            // Acquired timestamp — look up independently of the FormCache so items
+            // with a recorded timestamp always get it returned, even on a cache miss.
+            const auto ts = TimestampCache::GetSingleton()->Get(formID);
+
+            if (!data && ts == 0) {
+                // No cached form data and no timestamp — return undefined.
+                // This is expected for items the player has never opened an
+                // inventory menu with and that have never been acquired.
                 return;
             }
 
@@ -39,25 +45,25 @@ namespace SkyUI {
 
             RE::GFxValue val;
 
-            val.SetNumber(static_cast<double>(data->subType));
-            a_params.retVal->SetMember("subType", val);
+            if (data) {
+                val.SetNumber(static_cast<double>(data->subType));
+                a_params.retVal->SetMember("subType", val);
 
-            val.SetNumber(static_cast<double>(data->material));
-            a_params.retVal->SetMember("material", val);
+                val.SetNumber(static_cast<double>(data->material));
+                a_params.retVal->SetMember("material", val);
 
-            val.SetNumber(static_cast<double>(data->weightClass));
-            a_params.retVal->SetMember("weightClass", val);
+                val.SetNumber(static_cast<double>(data->weightClass));
+                a_params.retVal->SetMember("weightClass", val);
 
-            val.SetNumber(static_cast<double>(data->mainPartMask));
-            a_params.retVal->SetMember("mainPartMask", val);
+                val.SetNumber(static_cast<double>(data->mainPartMask));
+                a_params.retVal->SetMember("mainPartMask", val);
 
-            if (data->subTypeDisplayKey) {
-                val.SetString(data->subTypeDisplayKey);
-                a_params.retVal->SetMember("subTypeDisplay", val);
+                if (data->subTypeDisplayKey) {
+                    val.SetString(data->subTypeDisplayKey);
+                    a_params.retVal->SetMember("subTypeDisplay", val);
+                }
             }
 
-            // Acquired timestamp — 0 if never recorded (item predates the feature).
-            const auto ts = TimestampCache::GetSingleton()->Get(formID);
             val.SetNumber(static_cast<double>(ts));
             a_params.retVal->SetMember("acquiredTimestamp", val);
         }

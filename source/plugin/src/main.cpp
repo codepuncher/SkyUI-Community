@@ -14,12 +14,16 @@ namespace {
                 SkyUI::RegisterEventSinks();
                 break;
             case SKSE::MessagingInterface::kNewGame:
-            case SKSE::MessagingInterface::kPostLoadGame:
-                // Clear caches on new game or load so stale data from a previous
-                // session doesn't persist.  Caches are repopulated on next
-                // inventory open / item acquisition event.
+                // On a new game there is no cosave, so nothing was loaded into
+                // TimestampCache. Clear both caches so there is no stale data.
                 SkyUI::FormCache::GetSingleton()->Clear();
                 SkyUI::TimestampCache::GetSingleton()->Clear();
+                break;
+            case SKSE::MessagingInterface::kPostLoadGame:
+                // TimestampCache is already populated by LoadCallback (SKSE
+                // serialization) before this message fires — do NOT clear it.
+                // FormCache is in-memory only and must be rebuilt on next open.
+                SkyUI::FormCache::GetSingleton()->Clear();
                 break;
         }
     }

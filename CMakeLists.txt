@@ -242,6 +242,7 @@ if(IS_DEBUG_BUILD)
             "-DDEPLOY_LISTS_DIR=${_DEPLOY_LISTS_DIR}"
             "-DSWF_COMPILED_BASE=${CMAKE_BINARY_DIR}/interface"
             "-DSWF_PASSTHROUGH_BASE=${CMAKE_CURRENT_SOURCE_DIR}/data/interface"
+            "-DDATA_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/data"
             -P "${_DEPLOY_SCRIPT}"
         DEPENDS
             ${Papyrus_OUTPUT}
@@ -299,6 +300,7 @@ else()
         DEPENDS
             "${_BSA_FILE}"
             "${_ESP_FILE}"
+            "${SKSE_PLUGIN_DLL}"
         COMMENT "Packaging SkyUI_SE-${PROJECT_VERSION}.zip"
         VERBATIM
     )

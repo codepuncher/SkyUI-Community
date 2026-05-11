@@ -109,6 +109,7 @@ class CraftingMenu extends MovieClip
       this.ItemList.addEventListener("itemPress",this,"onItemSelect");
       this.ExitMenuRect.onPress = function()
       {
+         this._parent.saveIndices();
          gfx.io.GameDelegate.call("CloseMenu",[]);
       };
       this.bCanCraft = false;
@@ -412,6 +413,7 @@ class CraftingMenu extends MovieClip
          _loc5_.entryWidth -= CraftingLists.SHORT_LIST_OFFSET;
       }
       this.ItemList.layout = _loc5_;
+      this.restoreIndices();
       var _loc7_ = a_config.Input.controls.gamepad.prevColumn;
       var _loc6_ = a_config.Input.controls.gamepad.nextColumn;
       var _loc8_ = a_config.Input.controls.gamepad.sortOrder;
@@ -419,6 +421,34 @@ class CraftingMenu extends MovieClip
       this._sortOrderControls = {keyCode:_loc8_};
       this._searchKey = a_config.Input.controls.pc.search;
       this._searchControls = {keyCode:this._searchKey};
+   }
+   function saveIndices()
+   {
+      if(this._subtypeName == undefined || this.ItemList.layout == undefined)
+      {
+         return;
+      }
+      var so = SharedObject.getLocal("SkyUI_CraftingSort");
+      if(so.data[this._subtypeName] == undefined)
+      {
+         so.data[this._subtypeName] = {};
+      }
+      so.data[this._subtypeName].columnIndex = this.ItemList.layout.activeColumnIndex;
+      so.data[this._subtypeName].columnState = this.ItemList.layout.activeColumnState;
+      so.flush();
+   }
+   function restoreIndices()
+   {
+      if(this._subtypeName == undefined || this.ItemList.layout == undefined)
+      {
+         return;
+      }
+      var so = SharedObject.getLocal("SkyUI_CraftingSort");
+      var saved = so.data[this._subtypeName];
+      if(saved != undefined && saved.columnIndex != undefined && saved.columnState != undefined)
+      {
+         this.ItemList.layout.restoreColumnState(saved.columnIndex, saved.columnState);
+      }
    }
    function onItemListPressed(event)
    {
@@ -498,6 +528,7 @@ class CraftingMenu extends MovieClip
    }
    function onExitButtonPress()
    {
+      this.saveIndices();
       gfx.io.GameDelegate.call("CloseMenu",[]);
    }
    function onAuxButtonPress()

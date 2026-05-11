@@ -48,7 +48,7 @@ class ContainerMenu extends ItemMenu
    {
       super.setConfig(a_config);
       var _loc3_ = this.inventoryLists.itemList;
-      _loc3_.addDataProcessor(new InventoryDataSetter());
+      _loc3_.addDataProcessor(new InventoryDataSetter(a_config));
       _loc3_.addDataProcessor(new InventoryIconSetter(a_config.Appearance));
       _loc3_.addDataProcessor(new skyui.props.PropertyDataExtender(a_config.Appearance,a_config.Properties,"itemProperties","itemIcons","itemCompoundProperties"));
       var _loc5_ = skyui.components.list.ListLayoutManager.createLayout(a_config.ListLayout,"ItemListLayout");

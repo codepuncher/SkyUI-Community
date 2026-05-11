@@ -2,9 +2,9 @@ class BarterDataSetter extends InventoryDataSetter
 {
    var _barterBuyMult;
    var _barterSellMult;
-   function BarterDataSetter(a_barterBuyMult, a_barterSellMult)
+   function BarterDataSetter(a_barterBuyMult, a_barterSellMult, a_config)
    {
-      super();
+      super(a_config);
       this._barterBuyMult = a_barterBuyMult != undefined ? a_barterBuyMult : 1;
       this._barterSellMult = a_barterSellMult != undefined ? a_barterSellMult : 1;
    }

@@ -1,32 +1,110 @@
 class InventoryDataSetter extends ItemcardDataExtender
 {
-   // Benchmark counters — reset each processList call, accumulated per processEntry.
-   // Logged to the SKSE plugin log via SkyUI_SE_Log whenever new items are processed
-   // (i.e. each inventory open that contains items not yet seen this session).
-   var _perfFastCount = 0;
-   var _perfSlowCount = 0;
-   // Cached references to SKSE plugin Scaleform functions — set once per processList
+   // Cached reference to SKSE plugin Scaleform function — set once per processList
    // call so each processEntry does a cheap instance-variable read, not a _global lookup.
    var _getStaticData;
-   var _log;
-   function InventoryDataSetter()
+   // Timestamp display format (0–8) and exclusion flags — read from config on load.
+   var _timestampDisplayFormat = 0;
+   var _timestampExcludeGold = true;
+   var _timestampExcludeAmmo = true;
+   // Month and day name tables for display formatting.
+   static var MONTH_SHORT  = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+   static var MONTH_LONG   = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+   static var DAY_LONG     = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+   // Unix seconds when the current AS2 session started — used for session-relative format.
+   static var SESSION_START_SECS = Math.round((new Date()).getTime() / 1000);
+   // a_config: the full merged config object from ConfigManager (ItemList.timestampSort.*).
+   // Passed directly at construction time because registerLoadCallback fires too late
+   // (InventoryDataSetter is created inside ItemMenu.onConfigLoad → setConfig, so the
+   // configLoad event has already fired by the time we register).
+   // registerUpdateCallback IS kept so that when SKI_SettingsManager.OnMenuOpen pushes
+   // Papyrus overrides to the AS2 ConfigManager (after configLoad), the configUpdate event
+   // updates our instance variables with the correct saved values.
+   function InventoryDataSetter(a_config)
    {
       super();
+      _timestampDisplayFormat = 0;
+      _timestampExcludeGold = true;
+      _timestampExcludeAmmo = true;
+      this._applyTimestampConfig(a_config);
+      skyui.util.ConfigManager.registerUpdateCallback(this, "onConfigUpdate");
    }
-   // Override processList to time the full classification pass and log results.
+   function onConfigUpdate(event)
+   {
+      this._applyTimestampConfig(event.config);
+   }
+   function _applyTimestampConfig(cfg)
+   {
+      if (cfg == undefined || cfg.ItemList == undefined) return;
+      var ts = cfg.ItemList.timestampSort;
+      if (ts == undefined) return;
+      _timestampDisplayFormat = ts.displayFormat != undefined ? Number(ts.displayFormat) : 0;
+      var excluded = ts.excludedTypes != undefined ? String(ts.excludedTypes) : "";
+      var parts = excluded.split(",");
+      _timestampExcludeGold = false;
+      _timestampExcludeAmmo = false;
+      for (var i = 0; i < parts.length; i++) {
+         var part = parts[i].split(" ").join("");
+         if (part == "Gold") _timestampExcludeGold = true;
+         if (part == "Ammo") _timestampExcludeAmmo = true;
+      }
+   }
+   // Format a Unix timestamp (seconds) into a display string per _timestampDisplayFormat.
+   function formatTimestamp(ts)
+   {
+      if (ts <= 0) return "";
+      var now  = Math.round((new Date()).getTime() / 1000);
+      var diff = now - ts;
+      // Format 0: relative short  — "5m ago", "2h ago", "3d ago"
+      if (_timestampDisplayFormat == 0) {
+         if (diff < 3600)   return Math.floor(diff / 60) + "m ago";
+         if (diff < 86400)  return Math.floor(diff / 3600) + "h ago";
+         return Math.floor(diff / 86400) + "d ago";
+      }
+      // Format 1: relative long  — "5 minutes ago", "2 hours ago", "3 days ago"
+      if (_timestampDisplayFormat == 1) {
+         if (diff < 3600)   return Math.floor(diff / 60) + " minutes ago";
+         if (diff < 86400)  return Math.floor(diff / 3600) + " hours ago";
+         return Math.floor(diff / 86400) + " days ago";
+      }
+      var d = new Date(ts * 1000);
+      var mon  = d.getMonth();
+      var day  = d.getDate();
+      var year = d.getFullYear();
+      var hour = d.getHours();
+      var min  = d.getMinutes();
+      var yy   = String(year).substr(2);
+      var mm   = (mon + 1 < 10 ? "0" : "") + (mon + 1);
+      var dd   = (day < 10 ? "0" : "") + day;
+      var hh   = hour % 12 == 0 ? 12 : hour % 12;
+      var mm2  = (min < 10 ? "0" : "") + min;
+      var ampm = hour < 12 ? "AM" : "PM";
+      var hh24 = (hour < 10 ? "0" : "") + hour;
+      // Format 2: MM/DD/YY
+      if (_timestampDisplayFormat == 2) return mm + "/" + dd + "/" + yy;
+      // Format 3: Mon DD, YYYY
+      if (_timestampDisplayFormat == 3) return InventoryDataSetter.MONTH_SHORT[mon] + " " + day + ", " + year;
+      // Format 4: Month DD, YYYY
+      if (_timestampDisplayFormat == 4) return InventoryDataSetter.MONTH_LONG[mon] + " " + day + ", " + year;
+      // Format 5: Mon DD, YYYY HH:MM
+      if (_timestampDisplayFormat == 5) return InventoryDataSetter.MONTH_SHORT[mon] + " " + day + ", " + year + " " + hh24 + ":" + mm2;
+      // Format 6: HH:MM AM/PM
+      if (_timestampDisplayFormat == 6) return hh + ":" + mm2 + " " + ampm;
+      // Format 7: Day of Week
+      if (_timestampDisplayFormat == 7) return InventoryDataSetter.DAY_LONG[d.getDay()];
+      // Format 8: session-relative — time since this game session started
+      var sessionDiff = ts - InventoryDataSetter.SESSION_START_SECS;
+      if (sessionDiff < 0)  return "Before session";
+      var sh = Math.floor(sessionDiff / 3600);
+      var sm = Math.floor((sessionDiff % 3600) / 60);
+      return "+" + sh + "h " + sm + "m";
+   }
+   // Override processList to cache the SKSE Scaleform function reference once
+   // per call rather than doing a _global lookup in every processEntry.
    function processList(a_list)
    {
       _getStaticData = _global.SkyUI_SE_GetStaticData;
-      _log = _global.SkyUI_SE_Log;
-      _perfFastCount = 0;
-      _perfSlowCount = 0;
-      var _t0 = getTimer();
       super.processList(a_list);
-      var _elapsed = getTimer() - _t0;
-      var _total = _perfFastCount + _perfSlowCount;
-      if (_total > 0 && _log != undefined) {
-         _log("processList: " + _elapsed + "ms | " + _total + " items | fast=" + _perfFastCount + " slow=" + _perfSlowCount);
-      }
    }
    function processEntry(a_entryObject, a_itemInfo)
    {
@@ -43,11 +121,14 @@ class InventoryDataSetter extends ItemcardDataExtender
       var _sd = (_getStaticData != undefined)
                    ? _getStaticData(a_entryObject.formId)
                    : undefined;
-      // Acquisition timestamp (Unix seconds). 0 = unknown (item predates feature
-      // or type is excluded). Used by the Acquired sort column.
-      a_entryObject.acquiredTimestamp = (_sd != undefined && _sd.acquiredTimestamp > 0)
+      // Acquisition timestamp (Unix seconds). 0 = unknown (item predates feature)
+      // or type is excluded. Excluded items sort to the bottom of the Acquired column.
+      var isExcluded = (_timestampExcludeGold && a_entryObject.baseId == 0xF)
+                    || (_timestampExcludeAmmo  && a_entryObject.formType == skyui.defines.Form.TYPE_AMMO);
+      a_entryObject.acquiredTimestamp = (!isExcluded && _sd != undefined && _sd.acquiredTimestamp > 0)
                                         ? _sd.acquiredTimestamp
                                         : 0;
+      a_entryObject.acquiredTimestampDisplay = this.formatTimestamp(a_entryObject.acquiredTimestamp);
       switch(a_entryObject.formType)
       {
          case skyui.defines.Form.TYPE_SCROLLITEM:
@@ -60,7 +141,6 @@ class InventoryDataSetter extends ItemcardDataExtender
             a_entryObject.isEnchanted = a_itemInfo.effects != "";
             a_entryObject.infoArmor = a_itemInfo.armor <= 0 ? null : Math.round(a_itemInfo.armor * 100) / 100;
             if (_sd != undefined) {
-               _perfFastCount++;
                a_entryObject.mainPartMask = _sd.mainPartMask > 0 ? _sd.mainPartMask : undefined;
                a_entryObject.subType = _sd.subType >= 0 ? _sd.subType : null;
                a_entryObject.subTypeDisplay = _sd.subType >= 0 ? this.getArmorSubTypeDisplay(_sd.subType) : undefined;
@@ -72,7 +152,6 @@ class InventoryDataSetter extends ItemcardDataExtender
                // armor, etc.) and CC items that lack keywords, classified by FormID only.
                this.processArmorBaseId(a_entryObject);
             } else {
-               _perfSlowCount++;
                this.processArmorClass(a_entryObject);
                this.processArmorPartMask(a_entryObject);
                this.processMaterialKeywords(a_entryObject); 
@@ -83,14 +162,12 @@ class InventoryDataSetter extends ItemcardDataExtender
          case skyui.defines.Form.TYPE_BOOK:
             a_entryObject.isRead = (a_entryObject.flags & skyui.defines.Item.BOOKFLAG_READ) != 0;
             if (_sd != undefined) {
-               _perfFastCount++;
                a_entryObject.subType = _sd.subType >= 0 ? _sd.subType : null;
                a_entryObject.subTypeDisplay = this.getBookSubTypeDisplay(_sd.subType);
                // processBookBaseId handles CC fish maps by baseId;
                // those cannot be classified in C++ (CC plugin filename is unstable).
                this.processBookBaseId(a_entryObject);
             } else {
-               _perfSlowCount++;
                this.processBookType(a_entryObject);
                this.processBookBaseId(a_entryObject);
             }
@@ -103,7 +180,6 @@ class InventoryDataSetter extends ItemcardDataExtender
             break;
          case skyui.defines.Form.TYPE_MISC:
             if (_sd != undefined) {
-               _perfFastCount++;
                a_entryObject.subType = _sd.subType >= 0 ? _sd.subType : null;
                a_entryObject.subTypeDisplay = _sd.subTypeDisplay !== undefined
                   ? skyui.util.Translator.translate(_sd.subTypeDisplay)
@@ -112,7 +188,6 @@ class InventoryDataSetter extends ItemcardDataExtender
                // by baseId; those cannot be classified in C++ (CC plugin filename is unstable).
                this.processMiscBaseId(a_entryObject);
             } else {
-               _perfSlowCount++;
                this.processMiscType(a_entryObject);
                this.processMiscBaseId(a_entryObject);
             }
@@ -122,7 +197,6 @@ class InventoryDataSetter extends ItemcardDataExtender
             a_entryObject.isPoisoned = a_itemInfo.poisoned == true;
             a_entryObject.infoDamage = a_itemInfo.damage <= 0 ? null : Math.round(a_itemInfo.damage * 100) / 100;
             if (_sd != undefined) {
-               _perfFastCount++;
                a_entryObject.subType = _sd.subType >= 0 ? _sd.subType : null;
                a_entryObject.subTypeDisplay = _sd.subType >= 0 ? this.getWeaponSubTypeDisplay(_sd.subType) : skyui.util.Translator.translate("$Weapon");
                a_entryObject.material = _sd.material >= 0 ? _sd.material : null;
@@ -131,7 +205,6 @@ class InventoryDataSetter extends ItemcardDataExtender
                // that lack material keywords and are classified by FormID only.
                this.processWeaponBaseId(a_entryObject);
             } else {
-               _perfSlowCount++;
                this.processWeaponType(a_entryObject);
                this.processMaterialKeywords(a_entryObject);
                this.processWeaponBaseId(a_entryObject);
@@ -141,7 +214,6 @@ class InventoryDataSetter extends ItemcardDataExtender
             a_entryObject.isEnchanted = a_itemInfo.effects != "";
             a_entryObject.infoDamage = a_itemInfo.damage <= 0 ? null : Math.round(a_itemInfo.damage * 100) / 100;
             if (_sd != undefined) {
-               _perfFastCount++;
                a_entryObject.subType = _sd.subType >= 0 ? _sd.subType : null;
                a_entryObject.subTypeDisplay = this.getAmmoSubTypeDisplay(_sd.subType);
                a_entryObject.material = _sd.material >= 0 ? _sd.material : null;
@@ -150,7 +222,6 @@ class InventoryDataSetter extends ItemcardDataExtender
                // that lack material keywords and are classified by FormID only.
                this.processAmmoBaseId(a_entryObject);
             } else {
-               _perfSlowCount++;
                this.processAmmoType(a_entryObject);
                this.processMaterialKeywords(a_entryObject);
                this.processAmmoBaseId(a_entryObject);
@@ -163,21 +234,18 @@ class InventoryDataSetter extends ItemcardDataExtender
             a_entryObject.duration = a_entryObject.duration <= 0 ? null : Math.round(a_entryObject.duration * 100) / 100;
             a_entryObject.magnitude = a_entryObject.magnitude <= 0 ? null : Math.round(a_entryObject.magnitude * 100) / 100;
             if (_sd != undefined) {
-               _perfFastCount++;
                a_entryObject.subType = _sd.subType >= 0 ? _sd.subType : null;
                a_entryObject.subTypeDisplay = this.getPotionSubTypeDisplay(_sd.subType);
                // processPotionBaseId handles CC Ayleid Crystal potions by baseId;
                // those cannot be classified in C++ (CC plugin filename is unstable).
                this.processPotionBaseId(a_entryObject);
             } else {
-               _perfSlowCount++;
                this.processPotionType(a_entryObject);
                this.processPotionBaseId(a_entryObject);
             }
             break;
          case skyui.defines.Form.TYPE_SOULGEM:
             if (_sd != undefined) {
-               _perfFastCount++;
                a_entryObject.subType = _sd.subType >= 0 ? _sd.subType : null;
                a_entryObject.subTypeDisplay = skyui.util.Translator.translate("$Soul Gem");
                this.processSoulGemStatus(a_entryObject);
@@ -185,7 +253,6 @@ class InventoryDataSetter extends ItemcardDataExtender
                // those cannot be classified in C++ (CC plugin filename is unstable).
                this.processSoulGemBaseId(a_entryObject);
             } else {
-               _perfSlowCount++;
                this.processSoulGemType(a_entryObject);
                this.processSoulGemStatus(a_entryObject);
                this.processSoulGemBaseId(a_entryObject);

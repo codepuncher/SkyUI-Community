@@ -3,7 +3,7 @@ scriptname SKI_ConfigMenu extends SKI_ConfigBase
 ; SCRIPT VERSION ----------------------------------------------------------------------------------
 
 int function GetVersion()
-	return 9
+	return 11
 endFunction
 
 
@@ -117,6 +117,17 @@ string[]	_favGroupNames
 int			_favCurGroupIdx				= 0
 
 
+; -- Version 10 --
+
+; Lists
+string[]	_timestampDisplayFormatNames
+
+; State
+int			_timestampDisplayFormatIdx	= 0		; Relative short (2h ago)
+bool		_timestampExcludeGold		= true
+bool		_timestampExcludeAmmo		= true
+
+
 ; PROPERTIES --------------------------------------------------------------------------------------
 
 ; -- Version 1 --
@@ -153,6 +164,17 @@ event OnConfigInit()
 	_alignmentValues[0] = "left"
 	_alignmentValues[1] = "right"
 	_alignmentValues[2] = "center"
+
+	_timestampDisplayFormatNames = new string[9]
+	_timestampDisplayFormatNames[0] = "2h ago"
+	_timestampDisplayFormatNames[1] = "2 hours ago"
+	_timestampDisplayFormatNames[2] = "MM/DD/YY"
+	_timestampDisplayFormatNames[3] = "Mon DD, YYYY"
+	_timestampDisplayFormatNames[4] = "Month DD, YYYY"
+	_timestampDisplayFormatNames[5] = "Mon DD, YYYY HH:MM"
+	_timestampDisplayFormatNames[6] = "HH:MM AM/PM"
+	_timestampDisplayFormatNames[7] = "Day of Week"
+	_timestampDisplayFormatNames[8] = "Session-relative"
 
 	ApplySettings()
 endEvent
@@ -324,6 +346,38 @@ event OnVersionUpdate(int a_version)
 		_categoryIconThemeValues[3] = "skyui\\icons_category_straight.swf"
 	endIf
 
+	if (a_version >= 10 && CurrentVersion < 10)
+		Debug.Trace(self + ": Updating to script version 10")
+
+		_timestampDisplayFormatIdx = 0
+		_timestampExcludeGold = true
+		_timestampExcludeAmmo = true
+
+		Pages = new string[4]
+		Pages[0] = "$General"
+		Pages[1] = "$Controls"
+		Pages[2] = "$Item Sort"
+		Pages[3] = "$Advanced"
+
+		ApplyTimestampSortSettings()
+	endIf
+
+	if (a_version >= 11 && CurrentVersion < 11)
+		Debug.Trace(self + ": Updating to script version 11")
+
+		; Re-initialize format names without $ prefix (fixes stale save data from v10)
+		_timestampDisplayFormatNames = new string[9]
+		_timestampDisplayFormatNames[0] = "2h ago"
+		_timestampDisplayFormatNames[1] = "2 hours ago"
+		_timestampDisplayFormatNames[2] = "MM/DD/YY"
+		_timestampDisplayFormatNames[3] = "Mon DD, YYYY"
+		_timestampDisplayFormatNames[4] = "Month DD, YYYY"
+		_timestampDisplayFormatNames[5] = "Mon DD, YYYY HH:MM"
+		_timestampDisplayFormatNames[6] = "HH:MM AM/PM"
+		_timestampDisplayFormatNames[7] = "Day of Week"
+		_timestampDisplayFormatNames[8] = "Session-relative"
+	endIf
+
 
 endEvent
 
@@ -417,6 +471,15 @@ event OnPageReset(string a_page)
 		AddKeyMapOptionST("FAV_GROUP_USE_HOTKEY6", "$Group {6}", groupHotkeys[5], OPTION_FLAG_WITH_UNMAP)
 		AddKeyMapOptionST("FAV_GROUP_USE_HOTKEY7", "$Group {7}", groupHotkeys[6], OPTION_FLAG_WITH_UNMAP)
 		AddKeyMapOptionST("FAV_GROUP_USE_HOTKEY8", "$Group {8}", groupHotkeys[7], OPTION_FLAG_WITH_UNMAP)
+
+	; -------------------------------------------------------
+	elseIf (a_page == "$Item Sort")
+		SetCursorFillMode(TOP_TO_BOTTOM)
+
+		AddHeaderOption("$Acquired Timestamp")
+		AddMenuOptionST("TIMESTAMP_DISPLAY_FORMAT", "$Display Format", _timestampDisplayFormatNames[_timestampDisplayFormatIdx])
+		AddToggleOptionST("TIMESTAMP_EXCLUDE_GOLD", "$Exclude Gold", _timestampExcludeGold)
+		AddToggleOptionST("TIMESTAMP_EXCLUDE_AMMO", "$Exclude Ammo", _timestampExcludeAmmo)
 
 	; -------------------------------------------------------
 	elseIf (a_page == "$Advanced")
@@ -1522,6 +1585,78 @@ endState
 
 ; -------------------------------------------------------
 
+state TIMESTAMP_DISPLAY_FORMAT ; MENU
+
+	event OnMenuOpenST()
+		SetMenuDialogStartIndex(_timestampDisplayFormatIdx)
+		SetMenuDialogDefaultIndex(0)
+		SetMenuDialogOptions(_timestampDisplayFormatNames)
+	endEvent
+
+	event OnMenuAcceptST(int a_index)
+		_timestampDisplayFormatIdx = a_index
+		SetMenuOptionValueST(_timestampDisplayFormatNames[_timestampDisplayFormatIdx])
+		ApplyTimestampSortSettings()
+	endEvent
+
+	event OnDefaultST()
+		_timestampDisplayFormatIdx = 0
+		SetMenuOptionValueST(_timestampDisplayFormatNames[_timestampDisplayFormatIdx])
+		ApplyTimestampSortSettings()
+	endEvent
+
+	event OnHighlightST()
+		SetInfoText("Default: " + _timestampDisplayFormatNames[0])
+	endEvent
+
+endState
+
+; -------------------------------------------------------
+
+state TIMESTAMP_EXCLUDE_GOLD ; TOGGLE
+
+	event OnSelectST()
+		_timestampExcludeGold = !_timestampExcludeGold
+		SetToggleOptionValueST(_timestampExcludeGold)
+		ApplyTimestampSortSettings()
+	endEvent
+
+	event OnDefaultST()
+		_timestampExcludeGold = true
+		SetToggleOptionValueST(_timestampExcludeGold)
+		ApplyTimestampSortSettings()
+	endEvent
+
+	event OnHighlightST()
+		SetInfoText("Exclude Gold from the Acquired timestamp column.")
+	endEvent
+
+endState
+
+; -------------------------------------------------------
+
+state TIMESTAMP_EXCLUDE_AMMO ; TOGGLE
+
+	event OnSelectST()
+		_timestampExcludeAmmo = !_timestampExcludeAmmo
+		SetToggleOptionValueST(_timestampExcludeAmmo)
+		ApplyTimestampSortSettings()
+	endEvent
+
+	event OnDefaultST()
+		_timestampExcludeAmmo = true
+		SetToggleOptionValueST(_timestampExcludeAmmo)
+		ApplyTimestampSortSettings()
+	endEvent
+
+	event OnHighlightST()
+		SetInfoText("Exclude Ammo from the Acquired timestamp column.")
+	endEvent
+
+endState
+
+; -------------------------------------------------------
+
 ; FUNCTIONS ---------------------------------------------------------------------------------------
 
 ; @interface
@@ -1616,6 +1751,23 @@ function ApplyItemListFontSize()
 		SKI_SettingsManagerInstance.SetOverride("ListLayout$columns$equipColumn$border", "<0, 10, 3.2, 3.2>")
 		SKI_SettingsManagerInstance.SetOverride("ListLayout$columns$iconColumn$border", "<0, 4, 3.2, 3.2>")
 	endIf
+endFunction
+
+function ApplyTimestampSortSettings()
+	SKI_SettingsManagerInstance.SetOverride("ItemList$timestampSort$displayFormat", _timestampDisplayFormatIdx)
+
+	string excludedTypes = ""
+	if (_timestampExcludeGold)
+		excludedTypes = "Gold"
+	endIf
+	if (_timestampExcludeAmmo)
+		if (excludedTypes != "")
+			excludedTypes = excludedTypes + ",Ammo"
+		else
+			excludedTypes = "Ammo"
+		endIf
+	endIf
+	SKI_SettingsManagerInstance.SetOverride("ItemList$timestampSort$excludedTypes", excludedTypes)
 endFunction
 
 function Apply3DItemXOffset()

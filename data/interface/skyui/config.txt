@@ -701,22 +701,22 @@ columns.alchValueWeightColumn.state2.sortOptions = <{ASCENDING | NUMERIC}, {ASCE
 
 ; ITEM VIEWS -------------------------------------------------------
 views.defaultItemView.primaryColumn = itemNameColumn
-views.defaultItemView.columns = <equipColumn, iconColumn, itemNameColumn, subTypeColumn, weightColumn, valueColumn, valueWeightColumn>
+views.defaultItemView.columns = <equipColumn, iconColumn, itemNameColumn, subTypeColumn, weightColumn, valueColumn, valueWeightColumn, acquiredColumn>
 
 views.weaponView.primaryColumn = itemNameColumn
-views.weaponView.columns = <equipColumn, iconColumn, itemNameColumn, subTypeColumn, materialColumn, damageColumn, weightColumn, valueColumn, valueWeightColumn>
+views.weaponView.columns = <equipColumn, iconColumn, itemNameColumn, subTypeColumn, materialColumn, damageColumn, weightColumn, valueColumn, valueWeightColumn, acquiredColumn>
 views.weaponView.category = <Inventory.FILTERFLAG_INV_WEAPONS, Inventory.FILTERFLAG_CONTAINER_WEAPONS>
 
 views.armorView.primaryColumn = itemNameColumn
-views.armorView.columns = <equipColumn, iconColumn, itemNameColumn, subTypeColumn, classColumn, materialColumn, arColumn, weightColumn, valueColumn, valueWeightColumn>
+views.armorView.columns = <equipColumn, iconColumn, itemNameColumn, subTypeColumn, classColumn, materialColumn, arColumn, weightColumn, valueColumn, valueWeightColumn, acquiredColumn>
 views.armorView.category = <Inventory.FILTERFLAG_INV_ARMOR, Inventory.FILTERFLAG_CONTAINER_ARMOR>
 
 views.magicItemView.primaryColumn = itemNameColumn
-views.magicItemView.columns = <equipColumn, iconColumn, itemNameColumn, subTypeColumn, magnitudeColumn, durationColumn, weightColumn, valueColumn, valueWeightColumn>
+views.magicItemView.columns = <equipColumn, iconColumn, itemNameColumn, subTypeColumn, magnitudeColumn, durationColumn, weightColumn, valueColumn, valueWeightColumn, acquiredColumn>
 views.magicItemView.category = <Inventory.FILTERFLAG_INV_POTIONS, Inventory.FILTERFLAG_INV_SCROLLS, Inventory.FILTERFLAG_CONTAINER_POTIONS, Inventory.FILTERFLAG_CONTAINER_SCROLLS>
 
 views.keysView.primaryColumn = itemNameColumn
-views.keysView.columns = <equipColumn, iconColumn, itemNameColumn, weightColumn, valueColumn, valueWeightColumn>
+views.keysView.columns = <equipColumn, iconColumn, itemNameColumn, weightColumn, valueColumn, valueWeightColumn, acquiredColumn>
 views.keysView.category = <Inventory.FILTERFLAG_INV_KEYS, Inventory.FILTERFLAG_CONTAINER_KEYS>
 
 
